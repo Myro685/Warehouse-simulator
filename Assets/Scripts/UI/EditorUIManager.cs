@@ -23,6 +23,8 @@ namespace Warehouse.UI
         [SerializeField] private Button _btnLoad;
         [SerializeField] private Button _btnClear;
 
+        [SerializeField] private Button _btnSpawn;
+
         [SerializeField] private LevelStorageManager _storageManager;
 
         private void Start()
@@ -38,6 +40,15 @@ namespace Warehouse.UI
             if (_btnSave) _btnSave.onClick.AddListener(() => _storageManager.SaveLevel());
             if (_btnLoad) _btnLoad.onClick.AddListener(() => _storageManager.LoadLevel());
             if (_btnClear) _btnClear.onClick.AddListener(() => _storageManager.ClearLevel());
+
+
+            if (_btnSpawn) 
+            {
+                _btnSpawn.onClick.AddListener(() => {
+                    // Natvrdo spawneme vozík na pozici 0,0
+                    Managers.AgvManager.Instance.SpawnAgv(0, 0); 
+                });
+            }
         }
 
         private void SelectTool(TileType type)

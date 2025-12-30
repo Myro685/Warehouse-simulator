@@ -61,17 +61,22 @@ namespace Warehouse.Managers
             }
         }
 
-        // Debug metoda pro testování pohybu (později smažeme)
-        public void TestMoveFirstAgv()
+        // Přidej do Update v AgvManager.cs (jen pro testování!):
+        private void Update()
         {
-            // Zkusíme posunout první vozík o 1 doprava
-            AGVController agv = _activeAgvs[0];
-            GridNode current = agv.CurrentNode;
-            GridNode target = GridManager.Instance.GetNode(current.GridX + 1, current.GridY);
-
-            if (target != null && target.IsWalkable())
+            // Když zmáčkneš klávesu T, první vozík pojede na náhodné volné místo
+            if (Input.GetKeyDown(KeyCode.T) && _activeAgvs.Count > 0)
             {
-                agv.MoveToNode(target);
+                // Najdi náhodné souřadnice
+                int x = Random.Range(0, 20);
+                int y = Random.Range(0, 20);
+                GridNode target = GridManager.Instance.GetNode(x, y);
+
+                if (target != null && target.IsWalkable())
+                {
+                    Debug.Log($"Posílám vozík na [{x},{y}]");
+                    _activeAgvs[0].SetDestination(target);
+                }
             }
         }
     }
