@@ -1,7 +1,7 @@
 using UnityEngine;
 using TMPro;
 using Warehouse.Managers;
-using Unity.VisualScripting.Antlr3.Runtime.Misc;
+using Warehouse.Pathfinding;
 
 namespace Warehouse.UI
 {
@@ -13,6 +13,7 @@ namespace Warehouse.UI
         [Header("UI References")]
         [SerializeField] private TextMeshProUGUI _textCompleted;
         [SerializeField] private TextMeshProUGUI _textAvgTime;
+        [SerializeField] private TMP_Dropdown _algoDropdown;
 
         private void Start()
         {
@@ -23,6 +24,23 @@ namespace Warehouse.UI
 
                 // Prvotní update, aby tam nebyla nula
                 UpdateUI();
+            }
+            
+            // --- Nastavení Dropdownu ---
+            if (_algoDropdown != null)
+            {
+                _algoDropdown.onValueChanged.AddListener(OnAlgoChanged);
+            }
+        }
+
+        private void OnAlgoChanged(int index)
+        {
+            // Index 0 = A*, Index 1 = Dijkstra (podle pořadí v Options)
+            PathAlgorithm selectedAlgo = (index == 0) ? PathAlgorithm.AStar : PathAlgorithm.Dijkstra;
+
+            if (SimulationManager.Instance != null)
+            {
+                SimulationManager.Instance.SetAlgorithm(selectedAlgo);
             }
         }
 

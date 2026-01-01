@@ -44,15 +44,22 @@ namespace Warehouse.Units
         {
             _onDestinationReached = onReached;
             
-            List<GridNode> path = Pathfinder.FindPath(CurrentNode, targetNode);
-            if (path != null && path.Count > 0) 
+            // Pokud SimulationManager ještě neexistuje (např. při testech), použijeme default A*
+            PathAlgorithm algo = PathAlgorithm.AStar;
+            if (Managers.SimulationManager.Instance != null)
+            {
+                algo = Managers.SimulationManager.Instance.CurrentAlgorithm;
+            }
+
+            // Předáme algoritmus do Pathfindera
+            List<GridNode> path = Pathfinder.FindPath(CurrentNode, targetNode, algo);
+
+            if (path != null && path.Count > 0)
             {
                 StopAllCoroutines();
                 StartCoroutine(FollowPath(path));
-            }
-            else
+            } else
             {
-                // Pokud cesta neexistuje (např. stojíme na místě), rovnou zavoláme hotovo
                 Debug.LogWarning("Cesta je nulová nebo prázdná.");
                 onReached?.Invoke();
             }
