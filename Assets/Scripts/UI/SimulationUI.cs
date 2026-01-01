@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 using Warehouse.Managers;
 using Warehouse.Pathfinding;
 
@@ -14,6 +15,12 @@ namespace Warehouse.UI
         [SerializeField] private TextMeshProUGUI _textCompleted;
         [SerializeField] private TextMeshProUGUI _textAvgTime;
         [SerializeField] private TMP_Dropdown _algoDropdown;
+
+        [Header("Time Controls")]
+        [SerializeField] private Slider _speedSlider;
+        [SerializeField] private TextMeshProUGUI _speedValueText;
+        [SerializeField] private Button _pauseButton;
+        [SerializeField] private TextMeshProUGUI _pauseButtonText;
 
         private void Start()
         {
@@ -31,6 +38,16 @@ namespace Warehouse.UI
             {
                 _algoDropdown.onValueChanged.AddListener(OnAlgoChanged);
             }
+
+            if (_speedSlider != null)
+            {
+                _speedSlider.onValueChanged.AddListener(OnSpeedChanged);
+            }
+
+            if (_pauseButton != null)
+            {
+                _pauseButton.onClick.AddListener(OnPauseClicked);
+            }
         }
 
         private void OnAlgoChanged(int index)
@@ -41,6 +58,35 @@ namespace Warehouse.UI
             if (SimulationManager.Instance != null)
             {
                 SimulationManager.Instance.SetAlgorithm(selectedAlgo);
+            }
+        }
+
+        private void OnSpeedChanged(float value)
+        {
+            if (SimulationManager.Instance != null)
+            {
+                SimulationManager.Instance.SetSimulationSpeed(value);
+            }
+
+            // Aktualizace textu (např. "5x")
+            if (_speedValueText != null)
+            {
+                _speedValueText.text = $"{value}x";
+            }
+        }
+
+        private void OnPauseClicked()
+        {
+            if (SimulationManager.Instance != null)
+            {
+                SimulationManager.Instance.TogglePause();
+
+                // Změna textu tlačítka
+                if (_pauseButtonText != null)
+                {
+                    bool isPaused = SimulationManager.Instance.IsPaused;
+                    _pauseButtonText.text = isPaused ? "PLAY" : "PAUSE";
+                }
             }
         }
 

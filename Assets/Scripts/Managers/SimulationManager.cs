@@ -13,6 +13,9 @@ namespace Warehouse.Managers
         // Aktuálně vybraný algoritmus (výchozí je A*)
         public PathAlgorithm CurrentAlgorithm { get; private set; } = PathAlgorithm.AStar;
 
+        public bool IsPaused { get; private set; } = false;
+        private float _previousTimeScale = 1.0f;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -35,6 +38,34 @@ namespace Warehouse.Managers
             if (StatsManager.Instance != null)
             {
                 StatsManager.Instance.ResetStats();
+            }
+        }
+
+        /// <summary>
+        /// Nastaví rychlost simulace (1x, 2x, 5x...).
+        /// </summary>
+        public void SetSimulationSpeed(float speed)
+        {
+            if (!IsPaused)
+            {
+                Time.timeScale = speed;
+            }
+            _previousTimeScale = speed; // Pamatujeme si rychlost pro odpauzování
+        }
+
+        /// <summary>
+        /// Pozastaví nebo obnoví simulaci.
+        /// </summary>
+        public void TogglePause()
+        {
+            IsPaused = !IsPaused;
+
+            if (IsPaused)
+            {
+                Time.timeScale = 0f;
+            } else
+            {
+                Time.timeScale = _previousTimeScale;
             }
         }
     }
