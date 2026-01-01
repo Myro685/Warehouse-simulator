@@ -79,5 +79,20 @@ namespace Warehouse.Managers
                 }
             }
         }
+
+        /// <summary>
+        /// Najde první vozík, který nic nedělá.
+        /// </summary>
+        public AGVController GetAvailableAgv()
+        {
+            foreach (var agv in _activeAgvs)
+            {
+                if (agv.State == AGVState.Idle)
+                {
+                    return agv;
+                }
+            }
+            return null;
+        }
     }
 }

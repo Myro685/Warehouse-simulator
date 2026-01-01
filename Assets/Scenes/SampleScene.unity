@@ -2379,6 +2379,7 @@ GameObject:
   - component: {fileID: 1936779285}
   - component: {fileID: 1936779286}
   - component: {fileID: 1936779287}
+  - component: {fileID: 1936779288}
   m_Layer: 0
   m_Name: _GameManager
   m_TagString: Untagged
@@ -2464,6 +2465,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Warehouse.Managers.AgvManager
   _agvPrefab: {fileID: 2971904373383273271, guid: a7d7901e2975cdb4ab2b4f8c26aa24e2, type: 3}
   _agvContainer: {fileID: 182620143}
+--- !u!114 &1936779288
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1936779282}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7450888391aad7e418706e72dfead6f2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Warehouse.Managers.OrderManager
+  _autoGenerateOrders: 0
 --- !u!1 &2009710482
 GameObject:
   m_ObjectHideFlags: 0
