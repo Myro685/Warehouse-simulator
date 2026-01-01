@@ -23,6 +23,9 @@ namespace Warehouse.Grid
         // Odkaz na vizuální objekt ve scéně (např. instance zdi)
         public GameObject VisualObject {get; set;}
 
+        // Kdo na mě aktuálně stojí/jede
+        public Warehouse.Units.AGVController OccupiedBy { get; set; }
+
         // --- Data pro Pathfinding (A* / Dijkstra) ---
 
         // Cena cesty od startu k tomuto uzlu
@@ -58,6 +61,12 @@ namespace Warehouse.Grid
         {
             // Zdi a regály jsou neprůchozí (pro pohyb skrz)
             return Type != TileType.Wall && Type != TileType.Shelf;
+        }
+
+        // Je volno, pokud tu nikdo není NEBO pokud tu jsem já sám (pro případ přeplánování)
+        public bool IsAvailable(Warehouse.Units.AGVController asker)
+        {
+           return OccupiedBy == null || OccupiedBy == asker;
         }
     }
 }

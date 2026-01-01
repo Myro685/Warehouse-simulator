@@ -92,9 +92,41 @@ namespace Warehouse.Units
             List<GridNode> activePath = new List<GridNode>(path);
             UpdatePathVisual(activePath);
 
+            // 1. Zarezervujeme si startovní pozici (kde právě stojíme)
+            if (CurrentNode.OccupiedBy == null)
+            {
+                CurrentNode.OccupiedBy = this;
+            }
+
             while (activePath.Count > 0)
             {
                 GridNode targetNode = activePath[0];
+
+                
+                // --- KOLIZNÍ LOGIKA: Čekání na uvolnění ---
+                // Pokud je cílový uzel obsazený NĚKÝM JINÝM, čekáme
+                if (!targetNode.IsAvailable(this))
+                {
+                    // Volitelné: Změna barvy na červenou (Waiting)
+                    Debug.Log($"AGV {name} čeká na uvolnění uzlu [{targetNode.GridX},{targetNode.GridY}]");
+
+                    // Čekáme, dokud se uzel neuvolní
+                    // (Jednoduchá prevence deadlocku: čekáme max 5 sekund, pak to zkusíme "prorazit" nebo přepočítat)
+                    float waitTimer = 0f;
+                    while (!targetNode.IsAvailable(this))
+                    {
+                        waitTimer += Time.deltaTime;
+                        if (waitTimer > 5.0f)
+                        {
+                            Debug.LogWarning($"AGV {name} čeká už dlouho na [{targetNode.GridX},{targetNode.GridY}]!");
+                            waitTimer = 0f;
+                        }
+                        yield return null;
+                    }
+                }
+
+                // Uzel je volný -> Zarezervujeme si ho
+                targetNode.OccupiedBy = this;
                 
                 Vector3 startPos = transform.position;
                 Vector3 endPos = targetNode.WorldPosition;
@@ -181,6 +213,15 @@ namespace Warehouse.Units
         {
             yield return new WaitForSeconds(duration);
             onComplete?.Invoke();
+        }
+
+        private void Oestroy()
+        {
+            // Pokud vozík zmizí, uvolni místo
+            if (CurrentNode != null && CurrentNode.OccupiedBy == this)
+            {
+                CurrentNode.OccupiedBy = null;
+            }            
         }
     }
 }
