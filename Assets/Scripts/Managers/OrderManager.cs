@@ -129,6 +129,15 @@ namespace Warehouse.Managers
             {
                 order.Status = OrderStatus.Completed;
                 _activeOrders.Remove(order);
+
+                float duration = Time.time - order.CreationTime;
+
+                // Kontrola existence StatsManageru (pro bezpečnost)
+                if (StatsManager.Instance != null)
+                {
+                    StatsManager.Instance.RegisterCompletedOrder(duration);
+                }
+
                 Debug.Log($"Objednávka #{order.OrderId} DOKONČENA!");
                 
             }
