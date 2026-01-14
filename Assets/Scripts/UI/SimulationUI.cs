@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine.UI;
 using Warehouse.Managers;
 using Warehouse.Pathfinding;
+using UnityEngine.SceneManagement;
 
 namespace Warehouse.UI
 {
@@ -21,6 +22,9 @@ namespace Warehouse.UI
         [SerializeField] private TextMeshProUGUI _speedValueText;
         [SerializeField] private Button _pauseButton;
         [SerializeField] private TextMeshProUGUI _pauseButtonText;
+
+        [Header("System")]
+        [SerializeField] private Button _btnMenu;
 
         private void Start()
         {
@@ -48,6 +52,18 @@ namespace Warehouse.UI
             {
                 _pauseButton.onClick.AddListener(OnPauseClicked);
             }
+
+            if (_btnMenu != null)
+            {
+                _btnMenu.onClick.AddListener(BackToMenu);
+            }
+        }
+
+        private void BackToMenu()
+        {
+            SceneManager.LoadScene(0);
+
+            Time.timeScale = 1.0f;
         }
 
         private void OnAlgoChanged(int index)
