@@ -14,15 +14,15 @@ namespace Warehouse.UI
         [Header("Dependencies")]
         [SerializeField] private LevelEditorManager _levelEditor;
 
-        [Header("Buttons")]
+        [Header("Build Buttons")]
         [SerializeField] private Button _btnWall;
         [SerializeField] private Button _btnShelf;
+        [SerializeField] private Button _btnLoading;
+        [SerializeField] private Button _btnUnloading;
 
         [Header("System Buttons")]
         [SerializeField] private Button _btnSave;
         [SerializeField] private Button _btnLoad;
-        [SerializeField] private Button _btnClear;
-
         [SerializeField] private Button _btnSpawn;
 
         [SerializeField] private LevelStorageManager _storageManager;
@@ -31,15 +31,16 @@ namespace Warehouse.UI
         {
             // --- Nastavení posluchačů (Listeners) ---
 
-            // TileType.Wall má index 1
-            _btnWall.onClick.AddListener(() => SelectTool(TileType.Wall)); 
-            
-            // TileType.Shelf má index 2
-            _btnShelf.onClick.AddListener(() => SelectTool(TileType.Shelf));
+            // Přiřazení funkcí
+            _btnWall.onClick.AddListener(()=> SelectTool(TileType.Wall, _btnWall));
+            _btnShelf.onClick.AddListener(()=> SelectTool(TileType.Shelf, _btnShelf));
+            _btnLoading.onClick.AddListener(()=> SelectTool(TileType.LoadingDock, _btnLoading));
+            _btnUnloading.onClick.AddListener(()=> SelectTool(TileType.UnloadingDock, _btnUnloading));
+
+
 
             if (_btnSave) _btnSave.onClick.AddListener(() => _storageManager.SaveLevel());
             if (_btnLoad) _btnLoad.onClick.AddListener(() => _storageManager.LoadLevel());
-            if (_btnClear) _btnClear.onClick.AddListener(() => _storageManager.ClearLevel());
 
 
             if (_btnSpawn) 
@@ -51,7 +52,7 @@ namespace Warehouse.UI
             }
         }
 
-        private void SelectTool(TileType type)
+        private void SelectTool(TileType type, Button clickedButton)
         {
             // Předáme informaci do LevelEditorManageru
             // Musíme přetypovat enum na int, protože metoda SetTool bere int

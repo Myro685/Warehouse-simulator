@@ -56,7 +56,7 @@ namespace Warehouse.Managers
                     _grid[x, y] = new GridNode(x, y, worldPoint);
                 }
             }
-            
+
             Debug.Log($"Grid vytvořen: {_width}x{_height} buněk.");
         }
 

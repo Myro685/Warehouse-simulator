@@ -1,6 +1,7 @@
 using UnityEngine;
 using Warehouse.Grid;
 using Warehouse.Core;
+using UnityEngine.Tilemaps;
 
 namespace Warehouse.Managers
 {
@@ -18,6 +19,8 @@ namespace Warehouse.Managers
         [Header("Prefabs")]
         [SerializeField] private GameObject _wallPrefab;
         [SerializeField] private GameObject _shelfPrefab;
+        [SerializeField] private GameObject _loadingPrefab;
+        [SerializeField] private GameObject _unloadingPrefab;
 
         // Aktuálně vybraný typ pro stavbu
         private TileType _currentTool = TileType.Wall;
@@ -128,6 +131,8 @@ namespace Warehouse.Managers
             {
                 case TileType.Wall: return _wallPrefab;
                 case TileType.Shelf: return _shelfPrefab;
+                case TileType.LoadingDock: return _loadingPrefab;
+                case TileType.UnloadingDock: return _unloadingPrefab;
                 default: return null;
             }
         }
