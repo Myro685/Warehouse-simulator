@@ -215,13 +215,20 @@ namespace Warehouse.Units
             onComplete?.Invoke();
         }
 
-        private void Oestroy()
+        private void OnDestroy()
         {
-            // Pokud vozík zmizí, uvolni místo
+            // 1. Uvolni místo na Gridu
             if (CurrentNode != null && CurrentNode.OccupiedBy == this)
             {
                 CurrentNode.OccupiedBy = null;
-            }            
+            }
+
+            // 2. Odhlas se z AgvManageru (NOVÉ)
+            if (Managers.AgvManager.Instance != null)
+            {
+                Managers.AgvManager.Instance.UnregisterAgv(this);
+            }
         }
+
     }
 }

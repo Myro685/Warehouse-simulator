@@ -43,9 +43,17 @@ namespace Warehouse.Managers
                 return;
             }
 
+            // 1. Kontrola: Je to zeď?
             if (!node.IsWalkable())
             {
                 Debug.LogWarning("Nelze spawnout AGV do zdi nebo překážky.");
+                return;
+            }
+
+            // 2. Kontrola: Stojí tam už někdo? (Prevence spawnu 20 vozíků v sobě)
+            if (node.OccupiedBy != null)
+            {
+                Debug.LogWarning($"Na pozici [{x},{y}] už stojí vozík {node.OccupiedBy.name}!");
                 return;
             }
 
@@ -56,6 +64,10 @@ namespace Warehouse.Managers
             if (controller != null)
             {
                 controller.Initialize(node);
+                
+                // DŮLEŽITÉ: Hned při startu obsadíme uzel!
+                node.OccupiedBy = controller; 
+                
                 _activeAgvs.Add(controller);
                 Debug.Log($"AGV vytvořeno na [{x},{y}]");
             }
@@ -85,14 +97,31 @@ namespace Warehouse.Managers
         /// </summary>
         public AGVController GetAvailableAgv()
         {
-            foreach (var agv in _activeAgvs)
+            // Procházíme seznam pozpátku, abychom mohli bezpečně odebírat prvky
+            for (int i = _activeAgvs.Count - 1; i >= 0; i--)
             {
-                if (agv.State == AGVState.Idle)
+                // Pokud je objekt null (byl zničen), vyhodíme ho ze seznamu
+                if (_activeAgvs[i] == null)
                 {
-                    return agv;
+                    _activeAgvs.RemoveAt(i);
+                    continue;
+                }
+
+                // Pokud existuje a je Idle, vrátíme ho
+                if (_activeAgvs[i].State == AGVState.Idle)
+                {
+                    return _activeAgvs[i];
                 }
             }
             return null;
+        }
+
+        public void UnregisterAgv(AGVController agv)
+        {
+            if (_activeAgvs.Contains(agv))
+            {
+                _activeAgvs.Remove(agv);
+            }
         }
     }
 }

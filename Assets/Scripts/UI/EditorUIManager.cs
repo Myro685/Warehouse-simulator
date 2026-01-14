@@ -19,6 +19,7 @@ namespace Warehouse.UI
         [SerializeField] private Button _btnShelf;
         [SerializeField] private Button _btnLoading;
         [SerializeField] private Button _btnUnloading;
+        [SerializeField] private Button _btnSpawnAgv;
 
         [Header("System Buttons")]
         [SerializeField] private Button _btnSave;
@@ -36,7 +37,7 @@ namespace Warehouse.UI
             _btnShelf.onClick.AddListener(()=> SelectTool(TileType.Shelf, _btnShelf));
             _btnLoading.onClick.AddListener(()=> SelectTool(TileType.LoadingDock, _btnLoading));
             _btnUnloading.onClick.AddListener(()=> SelectTool(TileType.UnloadingDock, _btnUnloading));
-
+            _btnSpawnAgv.onClick.AddListener(()=> {_levelEditor.SetSpawnMode();});
 
 
             if (_btnSave) _btnSave.onClick.AddListener(() => _storageManager.SaveLevel());

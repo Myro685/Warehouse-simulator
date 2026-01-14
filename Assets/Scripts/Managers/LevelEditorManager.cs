@@ -2,6 +2,7 @@ using UnityEngine;
 using Warehouse.Grid;
 using Warehouse.Core;
 using UnityEngine.Tilemaps;
+using UnityEngine.XR;
 
 namespace Warehouse.Managers
 {
@@ -10,6 +11,8 @@ namespace Warehouse.Managers
     /// Převádí vstup myši na změny v Gridu.
     /// </summary>
     
+    public enum EditorMode { PaintTile, SpawnUnit }
+
     public class LevelEditorManager : MonoBehaviour
     {
         [Header("Settings")]
@@ -24,16 +27,33 @@ namespace Warehouse.Managers
 
         // Aktuálně vybraný typ pro stavbu
         private TileType _currentTool = TileType.Wall;
+        private EditorMode _currentMode = EditorMode.PaintTile;
 
         private void Update()
         {
-            // Pokud drží levé tlačítko myši, zkusíme kreslit
-            if (Input.GetMouseButton(0))
+            // Ochrana proti klikání do UI (aby se nekreslilo skrz tlačítka)
+            if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
+
+            // Logika podle režimu
+            if (_currentMode == EditorMode.SpawnUnit)
             {
-                HandleInput();
+                // PRO SPAWN: Reagujeme jen na stisknutí (Down)
+                if (Input.GetMouseButtonDown(0))
+                {
+                    HandleInput();
+                }
             }
-            // Pravé tlačítko pro mazání (nastavení na Empty)
-            else if (Input.GetMouseButton(1))
+            else // EditorMode.PaintTile
+            {
+                // PRO KRESLENÍ: Reagujeme po celou dobu držení
+                if (Input.GetMouseButton(0))
+                {
+                    HandleInput();
+                }
+            }
+
+            // Mazání (Pravé tlačítko)
+            if (Input.GetMouseButton(1))
             {
                 HandleInput(isErasing: true);
             }
@@ -44,23 +64,46 @@ namespace Warehouse.Managers
         /// </summary>
         private void HandleInput(bool isErasing = false)
         {
-            // Raycast z kamery do scény
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
             if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _groundLayer))
             {
-                // Získání Nodu z GridManageru na základě pozice dopadu paprsku
                 GridNode node = GridManager.Instance.GetNodeFromWorldPosition(hit.point);
 
                 if (node != null)
                 {
                     if (isErasing)
                     {
-                        ClearNode(node);
+                        // Pravé tlačítko maže buď vozík, nebo zeď
+                        // Priorita: Nejdřív smaž vozík, pokud tam je, jinak zeď
+                        if (node.OccupiedBy != null)
+                        {
+                            // TODO: Zde bychom ideálně měli volat metodu AgvManageru pro smazání
+                            // Prozatím Destroy(node.OccupiedBy.gameObject) je "dirty" řešení
+                            Destroy(node.OccupiedBy.gameObject);
+                            node.OccupiedBy = null;
+                        }
+                        else
+                        {
+                            ClearNode(node);
+                        }
                     }
                     else
                     {
-                        PlaceObject(node, _currentTool);
+                        // Levé tlačítko - chování podle módu
+                        if (_currentMode == EditorMode.PaintTile)
+                        {
+                            PlaceObject(node, _currentTool);
+                        }
+                        else if (_currentMode == EditorMode.SpawnUnit)
+                        {
+                            // Spawnujeme pouze při kliknutí (GetMouseButtonDown), ne při tažení
+                            // Abychom nespawnuli 50 vozíků na sebe
+                            if (Input.GetMouseButton(0))
+                            {
+                                Managers.AgvManager.Instance.SpawnAgv(node.GridX, node.GridY);
+                            }
+                        }
                     }
                 }
             }
@@ -140,7 +183,13 @@ namespace Warehouse.Managers
         // Metoda pro UI tlačítka
         public void SetTool(int typeIndex)
         {
+            _currentMode = EditorMode.PaintTile;
             _currentTool = (TileType)typeIndex;
+        }
+
+        public void SetSpawnMode()
+        {
+            _currentMode = EditorMode.SpawnUnit;
         }
     }
 }
