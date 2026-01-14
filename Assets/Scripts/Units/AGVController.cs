@@ -93,10 +93,7 @@ namespace Warehouse.Units
             UpdatePathVisual(activePath);
 
             // 1. Zarezervujeme si startovní pozici (kde právě stojíme)
-            if (CurrentNode.OccupiedBy == null)
-            {
-                CurrentNode.OccupiedBy = this;
-            }
+            if (CurrentNode.OccupiedBy == null) CurrentNode.OccupiedBy = this;
 
             while (activePath.Count > 0)
             {
@@ -107,19 +104,21 @@ namespace Warehouse.Units
                 // Pokud je cílový uzel obsazený NĚKÝM JINÝM, čekáme
                 if (!targetNode.IsAvailable(this))
                 {
-                    // Volitelné: Změna barvy na červenou (Waiting)
-                    Debug.Log($"AGV {name} čeká na uvolnění uzlu [{targetNode.GridX},{targetNode.GridY}]");
-
-                    // Čekáme, dokud se uzel neuvolní
-                    // (Jednoduchá prevence deadlocku: čekáme max 5 sekund, pak to zkusíme "prorazit" nebo přepočítat)
                     float waitTimer = 0f;
+                    // Čekáme max 2 sekundy (pro plynulost)
                     while (!targetNode.IsAvailable(this))
                     {
                         waitTimer += Time.deltaTime;
-                        if (waitTimer > 5.0f)
+
+                        // Pokud čekáme moc dlouho -> REROUTE (Přepočet)
+                        if (waitTimer > 2.0f)
                         {
-                            Debug.LogWarning($"AGV {name} čeká už dlouho na [{targetNode.GridX},{targetNode.GridY}]!");
-                            waitTimer = 0f;
+                            Debug.LogWarning($"AGV {name} je zablokován na [{targetNode.GridX},{targetNode.GridY}]. Přepočítávám trasu...");
+                            IsMoving = false;
+
+                            GridNode finalDestionation = activePath[activePath.Count - 1];
+                            SetDestination(finalDestionation, _onDestinationReached);
+                            yield break;
                         }
                         yield return null;
                     }
@@ -155,6 +154,12 @@ namespace Warehouse.Units
 
                 // Jsme v uzlu
                 transform.position = endPos;
+
+                if (CurrentNode != targetNode && CurrentNode.OccupiedBy == this)
+                {
+                    CurrentNode.OccupiedBy = null;
+                }
+
                 CurrentNode = targetNode;
 
                 activePath.RemoveAt(0);

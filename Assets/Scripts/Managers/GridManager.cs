@@ -92,11 +92,32 @@ namespace Warehouse.Managers
             {
                 foreach (GridNode node in _grid)
                 {
-                    // Barva podle typu (zatím jen bílá pro prázdné, červená kdyby byla zeď)
-                    Gizmos.color = (node.IsWalkable()) ? new Color(1, 1, 1, 0.3f) : Color.red;
-                    
-                    // Vykreslení malé kostičky reprezentující uzel
-                    Gizmos.DrawCube(node.WorldPosition, Vector3.one * (_cellSize * 0.9f));
+                    if (node == null) continue;
+
+                    // 1. Zdi (Červená plná)
+                    if (!node.IsWalkable())
+                    {
+                        Gizmos.color = new Color(1, 0, 0, 0.5f);
+                        Gizmos.DrawCube(node.WorldPosition, Vector3.one * (_cellSize * 0.9f));
+                    }
+
+                    // 2. Obsazená políčka (Modrá/Tyrkysová)
+                    else if (node.OccupiedBy != null)
+                    {
+                        Gizmos.color = Color.cyan;
+                        // Kreslíme menší kostičku, abychom viděli "rezervaci"
+                        Gizmos.DrawWireCube(node.WorldPosition, Vector3.one * (_cellSize * 0.8f));
+
+                        // Kreslíme čáru k vlastníkovi rezervace (odhalí chyby polohy)
+                        Gizmos.DrawLine(node.WorldPosition, node.OccupiedBy.transform.position);
+                    }
+
+                    // 3. Volná políčka (Bílá obrys)
+                    else
+                    {
+                        Gizmos.color = new Color(1, 1, 1, 0.1f);
+                        Gizmos.DrawWireCube(node.WorldPosition, Vector3.one * (_cellSize * 0.9f));
+                    }
                 }
             }
         }

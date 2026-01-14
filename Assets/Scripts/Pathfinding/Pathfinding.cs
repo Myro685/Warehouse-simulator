@@ -66,7 +66,8 @@ namespace Warehouse.Pathfinding
                 foreach (GridNode neighbor in GridManager.Instance.GetNeighbors(currentNode))
                 {
                     // Pokud je soused neprůchozí nebo už hotový, přeskoč ho
-                    if (!neighbor.IsWalkable() || closedSet.Contains(neighbor))
+                    bool isOccupiedByOther = (neighbor.OccupiedBy != null);
+                    if (!neighbor.IsWalkable() || closedSet.Contains(neighbor) || isOccupiedByOther)
                     {
                         continue;
                     }
