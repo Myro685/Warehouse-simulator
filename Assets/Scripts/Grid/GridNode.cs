@@ -59,8 +59,9 @@ namespace Warehouse.Grid
         /// </summary>
         public bool IsWalkable()
         {
-            // Zdi a regály jsou neprůchozí (pro pohyb skrz)
-            return Type != TileType.Wall && Type != TileType.Shelf;
+            // Zeď je jediná překážka. 
+            // Regály a Docky musí být průchozí, aby na ně vozík mohl vjet a pracovat.
+            return Type != TileType.Wall;
         }
 
         // Je volno, pokud tu nikdo není NEBO pokud tu jsem já sám (pro případ přeplánování)

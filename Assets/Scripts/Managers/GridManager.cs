@@ -135,5 +135,26 @@ namespace Warehouse.Managers
 
             return neighbors;
         }
+
+        /// <summary>
+        /// Vrátí seznam všech nodů daného typu (např. všechny Regály).
+        /// </summary>
+        public List<GridNode> GetNodesByType(TileType type)
+        {
+            List<GridNode> result = new List<GridNode>();
+
+            for (int x = 0; x < _width; x++)
+            {
+                for (int y = 0; y < _height; y++)
+                {
+                    if (_grid[x, y].Type == type)
+                    {
+                        result.Add(_grid[x, y]);
+                    }
+                }
+            }
+
+            return result;
+        }
     }
 }

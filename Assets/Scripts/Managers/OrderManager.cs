@@ -16,6 +16,8 @@ namespace Warehouse.Managers
 
         [Header("Setting")]
         [SerializeField] private bool _autoGenerateOrders = false;
+        [SerializeField] private float _orderGenerationInterval = 5f;
+        private float _timer = 0f;
 
         // Fronta čekajících objednávek
         private Queue<Order> _orderQueue = new Queue<Order>();
@@ -40,31 +42,22 @@ namespace Warehouse.Managers
             // Každý frame zkusíme přiřadit čekající objednávky
             AssignOrders();
 
+            // Manuální test (Klávesa O)
             if (Input.GetKeyDown(KeyCode.O))
             {
-                CreateRandomTestOrder();
+                 CreateLogisticOrder();
             }
-        }
 
-        private void CreateRandomTestOrder()
-        {
-            GridManager grid = GridManager.Instance;
-            Debug.Log("Provedeno");
-            // 1. Najdi náhodný start (Pickup)
-            GridNode pickupNode = GetRandomWalkableNode();
-            
-            // 2. Najdi náhodný cíl (Delivery), který není stejný jako start
-            GridNode deliveryNode = GetRandomWalkableNode();
-
-            // Pokud se nepovedlo najít volné místo nebo jsou stejné, zkusíme to znova příště
-            if (pickupNode == null || deliveryNode == null || pickupNode == deliveryNode)
+            // Automatické generování (pokud je zapnuto)
+            if (_autoGenerateOrders)
             {
-                Debug.LogWarning("Nepodařilo se najít validní body pro testovací objednávku.");
-                return;
+                _timer += Time.deltaTime;
+                if (_timer >= _orderGenerationInterval)
+                {
+                    _timer = 0f;
+                    CreateLogisticOrder();
+                }
             }
-
-            // 3. Vytvoř objednávku
-            CreateOrder(pickupNode, deliveryNode);
         }
 
         private GridNode GetRandomWalkableNode()
@@ -141,6 +134,56 @@ namespace Warehouse.Managers
                 Debug.Log($"Objednávka #{order.OrderId} DOKONČENA!");
                 
             }
+        }
+
+        private void CreateLogisticOrder()
+        {
+            GridManager grid = GridManager.Instance;
+
+            // Získáme všechny důležité body
+            List<GridNode> shelves = grid.GetNodesByType(TileType.Shelf);
+            List<GridNode> loadingDocks = grid.GetNodesByType(TileType.LoadingDock);
+            List<GridNode> unloadingDocks = grid.GetNodesByType(TileType.UnloadingDock);
+
+            // Pokud nemáme dostatek bodů, nelze vytvořit logistickou trasu
+            if (shelves.Count == 0)
+            {
+                Debug.LogWarning("Nelze generovat objednávku: Žádné regály (Shelf).");
+                return;
+            }
+
+            GridNode pickup = null;
+            GridNode delivery = null;
+
+            // Náhodně rozhodneme typ úlohy (50/50)
+            // Typ A: Naskladnění (Příjem -> Regál)
+            // Typ B: Vyskladnění (Regál -> Výdej)
+
+            bool isInBound = Random.value > 0.5f;
+
+            if (isInBound && loadingDocks.Count > 0)
+            {
+                // NASKLADNĚNÍ: Vyber náhodný příjem a náhodný regál
+                pickup = loadingDocks[Random.Range(0, loadingDocks.Count)];
+                delivery = shelves[Random.Range(0, shelves.Count)];
+                Debug.Log("Generuji NASKLADNĚNÍ (Loading -> Shelf)");
+            }
+            else if (!isInBound && unloadingDocks.Count > 0)
+            {
+                // VYSKLADNĚNÍ: Vyber náhodný regál a náhodný výdej
+                pickup = shelves[Random.Range(0, shelves.Count)];
+                delivery = unloadingDocks[Random.Range(0, unloadingDocks.Count)];
+                Debug.Log("Generuji VYSKLADNĚNÍ (Shelf -> Unloading)");
+            }
+            else
+            {
+                // Fallback, pokud chybí docky
+                Debug.LogWarning("Chybí Loading nebo Unloading docky pro generování trasy.");
+                return;
+            }
+
+            // Vytvoření objednávky
+            CreateOrder(pickup, delivery);
         }
     }
 }
