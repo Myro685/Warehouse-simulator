@@ -18,7 +18,9 @@ namespace Warehouse.Managers
         [SerializeField] private Transform _agvContainer;
 
         // Seznam všech aktivních vozíků
-        private List<AGVController> _activeAgvs = new List<AGVController>();
+        public List<AGVController> _activeAgvs = new List<AGVController>();
+
+        public int ActiveAgvCount => _activeAgvs.Count;
 
         private void Awake()
         {

@@ -20,12 +20,6 @@ namespace Warehouse.UI
         [SerializeField] private Button _btnLoading;
         [SerializeField] private Button _btnUnloading;
         [SerializeField] private Button _btnSpawnAgv;
-
-        [Header("System Buttons")]
-        [SerializeField] private Button _btnSave;
-        [SerializeField] private Button _btnLoad;
-        [SerializeField] private Button _btnSpawn;
-
         [SerializeField] private LevelStorageManager _storageManager;
 
         private void Start()
@@ -38,19 +32,6 @@ namespace Warehouse.UI
             _btnLoading.onClick.AddListener(()=> SelectTool(TileType.LoadingDock, _btnLoading));
             _btnUnloading.onClick.AddListener(()=> SelectTool(TileType.UnloadingDock, _btnUnloading));
             _btnSpawnAgv.onClick.AddListener(()=> {_levelEditor.SetSpawnMode();});
-
-
-            if (_btnSave) _btnSave.onClick.AddListener(() => _storageManager.SaveLevel());
-            if (_btnLoad) _btnLoad.onClick.AddListener(() => _storageManager.LoadLevel());
-
-
-            if (_btnSpawn) 
-            {
-                _btnSpawn.onClick.AddListener(() => {
-                    // Natvrdo spawneme vozík na pozici 0,0
-                    Managers.AgvManager.Instance.SpawnAgv(0, 0); 
-                });
-            }
         }
 
         private void SelectTool(TileType type, Button clickedButton)

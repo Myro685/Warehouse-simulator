@@ -104,6 +104,11 @@ namespace Warehouse.Units
                 // Pokud je cílový uzel obsazený NĚKÝM JINÝM, čekáme
                 if (!targetNode.IsAvailable(this))
                 {
+                    if (Managers.StatsManager.Instance != null)
+                    {
+                        Managers.StatsManager.Instance.RegisterCollision();
+                    }
+                    
                     float waitTimer = 0f;
                     // Čekáme max 2 sekundy (pro plynulost)
                     while (!targetNode.IsAvailable(this))
@@ -116,8 +121,8 @@ namespace Warehouse.Units
                             Debug.LogWarning($"AGV {name} je zablokován na [{targetNode.GridX},{targetNode.GridY}]. Přepočítávám trasu...");
                             IsMoving = false;
 
-                            GridNode finalDestionation = activePath[activePath.Count - 1];
-                            SetDestination(finalDestionation, _onDestinationReached);
+                            GridNode finalDestination = activePath[activePath.Count - 1];
+                            SetDestination(finalDestination, _onDestinationReached);
                             yield break;
                         }
                         yield return null;
@@ -141,12 +146,22 @@ namespace Warehouse.Units
                 {
                     float distCovered = (Time.time - startTime) * _moveSpeed;
                     float fractionOfJourney = distCovered / journeyLength;
-                    
+                    float distStep = Vector3.Distance(transform.position, endPos);
+
                     transform.position = Vector3.Lerp(startPos, endPos, fractionOfJourney);
                     
                     if (_lineRenderer.positionCount > 0)
                     {
                         _lineRenderer.SetPosition(0, transform.position);
+                    }
+
+                    float distanceTraveled = Vector3.Distance(CurrentNode.WorldPosition, targetNode.WorldPosition);
+                    if (Managers.StatsManager.Instance != null)
+                    {
+                        Managers.StatsManager.Instance.AddDistance(distanceTraveled);
+                        
+                        // Čas pohybu (přibližně): distance / speed
+                        Managers.StatsManager.Instance.AddMovingTime(distanceTraveled / _moveSpeed);
                     }
 
                     yield return null; // Čekáme na další frame
@@ -160,6 +175,8 @@ namespace Warehouse.Units
                     CurrentNode.OccupiedBy = null;
                 }
 
+                targetNode.AddVisit();
+        
                 CurrentNode = targetNode;
 
                 activePath.RemoveAt(0);
@@ -176,7 +193,7 @@ namespace Warehouse.Units
         public void AssignOrder(Order order)
         {
             _currentOrder = order;
-            _currentOrder.Status = OrderStatus.Assingned; // Opraven překlep
+            _currentOrder.Status = OrderStatus.Assigned; // Opraven překlep
 
             State = AGVState.MovingToPickup;
             // Řekneme: Jeď na Pickup a AŽ TAM DOJEDEŠ, spusť OnPickupReached

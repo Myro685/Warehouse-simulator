@@ -5,7 +5,7 @@ namespace Warehouse.Grid
     public enum OrderStatus
     {
         Pending, // Čeká ve frontě
-        Assingned, // Přiřazena vozíku (jede pro ni)
+        Assigned, // Přiřazena vozíku (jede pro ni)
         PickedUp, // Vozík náklad naložil (jede do cíle)
         Completed, // Hotovo
     }

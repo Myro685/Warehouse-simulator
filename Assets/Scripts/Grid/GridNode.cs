@@ -40,6 +40,19 @@ namespace Warehouse.Grid
         // F Cost je součet G + H (vypočítaná vlastnost)
         public int FCost => GCost + HCost;
 
+        // Počet návštěv vozíkem
+        public int VisitCount { get; private set; } = 0;
+
+        public void AddVisit()
+        {
+            VisitCount++;
+        }
+
+        public void ResetVisits()
+        {
+            VisitCount = 0;
+        }
+
         /// <summary>
         /// Konstruktor uzlu.
         /// </summary>

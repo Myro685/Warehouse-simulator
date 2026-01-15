@@ -21,6 +21,7 @@ namespace Warehouse.Managers
 
         // Fronta čekajících objednávek
         private Queue<Order> _orderQueue = new Queue<Order>();
+        public int QueueCount => _orderQueue.Count;
 
         // Seznam aktivních objednávek (pro přehled)
         private List<Order> _activeOrders = new List<Order>();
@@ -130,6 +131,22 @@ namespace Warehouse.Managers
                 {
                     StatsManager.Instance.RegisterCompletedOrder(duration);
                 }
+
+                string algoName = "Unknown";
+                if (SimulationManager.Instance != null)
+                {
+                    algoName = SimulationManager.Instance.CurrentAlgorithm.ToString();
+                }
+
+                CsvExporter.WriteRow(
+                    order.OrderId,
+                    algoName,
+                    0, // TODO: Vylepšení - ukládat vzdálenost do Orderu
+                    duration,
+                    0, // TODO: Vylepšení - ukládat kolize do Orderu
+                    order.CreationTime,
+                    Time.time
+                );
 
                 Debug.Log($"Objednávka #{order.OrderId} DOKONČENA!");
                 

@@ -2,107 +2,116 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using Warehouse.Managers;
-using Warehouse.Pathfinding;
-using UnityEngine.SceneManagement;
 using System;
 
 namespace Warehouse.UI
 {
-    /// <summary>
-    /// Zobrazuje statistiky simulace v reálném čase.
-    /// </summary>
     public class SimulationUI : MonoBehaviour
     {
-        [Header("Stats")]
-        [SerializeField] private TextMeshProUGUI _textCompleted;
-        [SerializeField] private TextMeshProUGUI _textAvgTime;
+        [Header("Top Left - Tools")]
         [SerializeField] private TMP_Dropdown _algoDropdown;
+        [SerializeField] private Button _btnHeatmap;
+        [SerializeField] private Button _btnSave;
+        [SerializeField] private Button _btnLoad;
 
-        [Header("Controls (Modern UI)")]
+        [Header("Top Center - Controls")]
         [SerializeField] private Slider _speedSlider;
-        [SerializeField] private TextMeshProUGUI _speedValueText;
+        [SerializeField] private TextMeshProUGUI _speedValueText; // Pokud ho máš zvlášť, jinak je v Timeru
         [SerializeField] private Button _btnPlayPause;
         [SerializeField] private TextMeshProUGUI _btnPlayPauseLabel;
         [SerializeField] private TextMeshProUGUI _textTimer;
         [SerializeField] private Button _btnReset;
 
-        [Header("System")]
-        [SerializeField] private Button _btnMenu;
+        [Header("Top Right - Stats")]
+        [SerializeField] private TextMeshProUGUI _textCompleted;
+        [SerializeField] private TextMeshProUGUI _textAvgTime;
+        [SerializeField] private TextMeshProUGUI _textCollisions; // NOVÉ
+        [SerializeField] private TextMeshProUGUI _textDistance;   // NOVÉ
+        [SerializeField] private TextMeshProUGUI _textQueue;      // NOVÉ (Fronta)
 
+        // Rychlostní kroky
         private readonly float[] _speedSteps = { 0.5f, 1f, 2f, 4f, 8f };
+
+        [SerializeField] private LevelStorageManager _storageManager;
 
         private void Start()
         {
-            // Přihlásíme se k odběru události ze StatsManageru
+            InitializeManagers();
+            InitializeListeners();
+            
+            // Inicializace slideru
+            if (_speedSlider != null)
+            {
+                _speedSlider.minValue = 0;
+                _speedSlider.maxValue = _speedSteps.Length - 1;
+                _speedSlider.wholeNumbers = true;
+                _speedSlider.value = 1; // Start na 1x
+            }
+        }
+
+        private void InitializeManagers()
+        {
             if (StatsManager.Instance != null)
             {
                 StatsManager.Instance.OnStatsChanged += UpdateStatsUI;
-
-                // Prvotní update, aby tam nebyla nula
-                UpdateStatsUI();
+                UpdateStatsUI(); // Prvotní vykreslení
             }
-            
-            // --- Napojení Simulation Manageru ---
+
             if (SimulationManager.Instance != null)
             {
-                // Přihlášení k událostem (Observer)
                 SimulationManager.Instance.OnPauseStateChanged += UpdatePauseButton;
-                SimulationManager.Instance.OnSpeedChanged += UpdateSpeedText;
                 SimulationManager.Instance.OnTimeUpdated += UpdateTimer;
+                // SimulationManager.Instance.OnSpeedChanged += ... (řešíme lokálně přes slider)
             }
+        }
 
-            // --- Listenery pro UI prvky ---
+        private void InitializeListeners()
+        {
+            // Left Panel
             if (_algoDropdown != null) _algoDropdown.onValueChanged.AddListener(OnAlgoChanged);
+            if (_btnHeatmap != null) _btnHeatmap.onClick.AddListener(OnHeatmapClicked);
+            if (_btnSave != null) _btnSave.onClick.AddListener(OnSaveClicked);
+            if (_btnLoad != null) _btnLoad.onClick.AddListener(OnLoadClicked);
+
+            // Center Panel
             if (_speedSlider != null) _speedSlider.onValueChanged.AddListener(OnSpeedChanged);
             if (_btnPlayPause != null) _btnPlayPause.onClick.AddListener(OnPlayPauseClicked);
             if (_btnReset != null) _btnReset.onClick.AddListener(OnResetClicked);
-
-            if (_speedSlider != null)
-        {
-            // Nastavíme slideru správný rozsah podle našeho pole
-            _speedSlider.minValue = 0;
-            _speedSlider.maxValue = _speedSteps.Length - 1;
-            _speedSlider.wholeNumbers = true;
-            
-            // Nastavíme výchozí pozici na "1x" (což je index 1 v poli: 0.5, [1], 2...)
-            _speedSlider.value = 1; 
-
-            _speedSlider.onValueChanged.AddListener(OnSpeedChanged);
         }
-        }
-        
+
         private void OnDestroy()
         {
-            // Vždy se musíme odhlásit, abychom nezpůsobili memory leaks
             if (StatsManager.Instance != null) StatsManager.Instance.OnStatsChanged -= UpdateStatsUI;
             
             if (SimulationManager.Instance != null)
             {
                 SimulationManager.Instance.OnPauseStateChanged -= UpdatePauseButton;
-                SimulationManager.Instance.OnSpeedChanged -= UpdateSpeedText;
                 SimulationManager.Instance.OnTimeUpdated -= UpdateTimer;
             }
         }
 
-        
+        // --- UI Updates ---
+
         private void UpdateStatsUI()
         {
-            if (_textCompleted) _textCompleted.text = $"HOTOVO: {StatsManager.Instance.CompletedOrders}";
-            if (_textAvgTime) _textAvgTime.text = $"PRŮMĚR: {StatsManager.Instance.AverageDeliveryTime:F1}s";
-        }
+            if (StatsManager.Instance == null) return;
 
-        private void UpdatePauseButton(bool isPaused)
-        {
-            if (_btnPlayPauseLabel != null)
+            // Základní
+            if (_textCompleted) _textCompleted.text = $"Hotovo: {StatsManager.Instance.CompletedOrders}";
+            if (_textAvgTime) _textAvgTime.text = $"Prům. čas: {StatsManager.Instance.AverageDeliveryTime:F1}s";
+            
+            // Rozšířené (pokud jsi je přidal do StatsManageru v minulé fázi)
+            if (_textCollisions) _textCollisions.text = $"Kolize: {StatsManager.Instance.TotalCollisions}";
+            if (_textDistance) _textDistance.text = $"Ujeto: {StatsManager.Instance.TotalDistanceTravelled:F0}m";
+
+            // Fronta (Musíme získat z OrderManageru)
+            if (_textQueue != null && OrderManager.Instance != null)
             {
-                // Použijeme EMOJI pro moderní vzhled
-                _btnPlayPauseLabel.text = isPaused ? "PLAY" : "PAUSE"; 
+                 // Potřebuješ přidat property 'QueueCount' do OrderManageru!
+                 // Zatím to hardcoduji na 0, dokud to nepřidáš:
+                 // _textQueue.text = $"📦 Ve frontě: {OrderManager.Instance.QueueCount}";
+                 _textQueue.text = "Ve frontě: ?"; 
             }
-        }
-
-        private void UpdateSpeedText(float speed)
-        {
-            if (_speedValueText != null) _speedValueText.text = $"{speed}x";
         }
 
         private void UpdateTimer(float totalSeconds)
@@ -110,61 +119,76 @@ namespace Warehouse.UI
             if (_textTimer != null)
             {
                 TimeSpan t = TimeSpan.FromSeconds(totalSeconds);
-                
-                // Rich Text formátování pro hezčí vzhled
+                float currentSpeed = SimulationManager.Instance.SimulationSpeed;
                 _textTimer.text = string.Format("{0:D2}:{1:D2} <size=60%><color=#AAAAAA></color></size>", 
-                                                t.Minutes, t.Seconds);
+                                                t.Minutes, t.Seconds, currentSpeed);
             }
         }
 
-        private void BackToMenu()
+        private void UpdatePauseButton(bool isPaused)
         {
-            SceneManager.LoadScene(0);
-
-            Time.timeScale = 1.0f;
+            if (_btnPlayPauseLabel != null)
+                _btnPlayPauseLabel.text = isPaused ? "START" : "STOP";
         }
 
-        private void OnAlgoChanged(int index)
-        {
-            // Index 0 = A*, Index 1 = Dijkstra (podle pořadí v Options)
-            PathAlgorithm selectedAlgo = (index == 0) ? PathAlgorithm.AStar : PathAlgorithm.Dijkstra;
+        // --- Actions ---
 
-            if (SimulationManager.Instance != null)
-            {
-                SimulationManager.Instance.SetAlgorithm(selectedAlgo);
-            }
+        private void OnAlgoChanged(int index) 
+        { 
+            // 0 = A*, 1 = Dijkstra
+            var algo = (index == 0) ? Warehouse.Pathfinding.PathAlgorithm.AStar : Warehouse.Pathfinding.PathAlgorithm.Dijkstra;
+            SimulationManager.Instance.SetAlgorithm(algo);
         }
 
         private void OnSpeedChanged(float value)
         {
-            // Převedeme float ze slideru na int index (0, 1, 2, 3, 4)
             int index = Mathf.RoundToInt(value);
-            
-            // Pojistka, abychom nesáhli mimo pole
             index = Mathf.Clamp(index, 0, _speedSteps.Length - 1);
-
-            // Vybereme skutečnou rychlost z pole
             float realSpeed = _speedSteps[index];
-
-            if (SimulationManager.Instance != null)
-            {
-                SimulationManager.Instance.SetSimulationSpeed(realSpeed);
-            }
             
-            // Aktualizujeme text (teď to bude ukazovat správně 0.5x, 8x atd.)
-            if (_speedValueText != null)
+            if (SimulationManager.Instance != null)
+                SimulationManager.Instance.SetSimulationSpeed(realSpeed);
+            
+            // Aktualizace textu proběhne v UpdateTimer
+        }
+
+        private void OnPlayPauseClicked() => SimulationManager.Instance.TogglePause();
+        private void OnResetClicked() => SimulationManager.Instance.ResetSimulation();
+
+        // --- Nové Tlačítka ---
+
+        private void OnHeatmapClicked()
+        {
+            if (HeatmapManager.Instance != null)
+                HeatmapManager.Instance.ToggleHeatmap();
+        }
+
+        private void OnSaveClicked()
+        {
+            // ZMĚNA: Voláme LevelStorageManager místo GridManageru
+            if (_storageManager != null)
             {
-                _speedValueText.text = $"{realSpeed}x";
+                Debug.Log("UI: Ukládám...");
+                _storageManager.SaveLevel(); 
+            }
+            else
+            {
+                Debug.LogError("Chybí reference na LevelStorageManager v SimulationUI!");
             }
         }
 
-        private void OnPlayPauseClicked()
+        private void OnLoadClicked()
         {
-            SimulationManager.Instance.TogglePause();
-        }
-        private void OnResetClicked()
-        {
-            SimulationManager.Instance.ResetSimulation();
+            // ZMĚNA: Voláme LevelStorageManager místo GridManageru
+            if (_storageManager != null)
+            {
+                Debug.Log("UI: Načítám...");
+                _storageManager.LoadLevel();
+            }
+             else
+            {
+                Debug.LogError("Chybí reference na LevelStorageManager v SimulationUI!");
+            }
         }
     }
 }
