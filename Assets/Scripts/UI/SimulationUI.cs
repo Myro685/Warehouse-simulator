@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using Warehouse.Managers;
 using Warehouse.Pathfinding;
 using UnityEngine.SceneManagement;
+using System;
 
 namespace Warehouse.UI
 {
@@ -12,50 +13,107 @@ namespace Warehouse.UI
     /// </summary>
     public class SimulationUI : MonoBehaviour
     {
-        [Header("UI References")]
+        [Header("Stats")]
         [SerializeField] private TextMeshProUGUI _textCompleted;
         [SerializeField] private TextMeshProUGUI _textAvgTime;
         [SerializeField] private TMP_Dropdown _algoDropdown;
 
-        [Header("Time Controls")]
+        [Header("Controls (Modern UI)")]
         [SerializeField] private Slider _speedSlider;
         [SerializeField] private TextMeshProUGUI _speedValueText;
-        [SerializeField] private Button _pauseButton;
-        [SerializeField] private TextMeshProUGUI _pauseButtonText;
+        [SerializeField] private Button _btnPlayPause;
+        [SerializeField] private TextMeshProUGUI _btnPlayPauseLabel;
+        [SerializeField] private TextMeshProUGUI _textTimer;
+        [SerializeField] private Button _btnReset;
 
         [Header("System")]
         [SerializeField] private Button _btnMenu;
+
+        private readonly float[] _speedSteps = { 0.5f, 1f, 2f, 4f, 8f };
 
         private void Start()
         {
             // Přihlásíme se k odběru události ze StatsManageru
             if (StatsManager.Instance != null)
             {
-                StatsManager.Instance.OnStatsChanged += UpdateUI;
+                StatsManager.Instance.OnStatsChanged += UpdateStatsUI;
 
                 // Prvotní update, aby tam nebyla nula
-                UpdateUI();
+                UpdateStatsUI();
             }
             
-            // --- Nastavení Dropdownu ---
-            if (_algoDropdown != null)
+            // --- Napojení Simulation Manageru ---
+            if (SimulationManager.Instance != null)
             {
-                _algoDropdown.onValueChanged.AddListener(OnAlgoChanged);
+                // Přihlášení k událostem (Observer)
+                SimulationManager.Instance.OnPauseStateChanged += UpdatePauseButton;
+                SimulationManager.Instance.OnSpeedChanged += UpdateSpeedText;
+                SimulationManager.Instance.OnTimeUpdated += UpdateTimer;
             }
+
+            // --- Listenery pro UI prvky ---
+            if (_algoDropdown != null) _algoDropdown.onValueChanged.AddListener(OnAlgoChanged);
+            if (_speedSlider != null) _speedSlider.onValueChanged.AddListener(OnSpeedChanged);
+            if (_btnPlayPause != null) _btnPlayPause.onClick.AddListener(OnPlayPauseClicked);
+            if (_btnReset != null) _btnReset.onClick.AddListener(OnResetClicked);
 
             if (_speedSlider != null)
-            {
-                _speedSlider.onValueChanged.AddListener(OnSpeedChanged);
-            }
+        {
+            // Nastavíme slideru správný rozsah podle našeho pole
+            _speedSlider.minValue = 0;
+            _speedSlider.maxValue = _speedSteps.Length - 1;
+            _speedSlider.wholeNumbers = true;
+            
+            // Nastavíme výchozí pozici na "1x" (což je index 1 v poli: 0.5, [1], 2...)
+            _speedSlider.value = 1; 
 
-            if (_pauseButton != null)
+            _speedSlider.onValueChanged.AddListener(OnSpeedChanged);
+        }
+        }
+        
+        private void OnDestroy()
+        {
+            // Vždy se musíme odhlásit, abychom nezpůsobili memory leaks
+            if (StatsManager.Instance != null) StatsManager.Instance.OnStatsChanged -= UpdateStatsUI;
+            
+            if (SimulationManager.Instance != null)
             {
-                _pauseButton.onClick.AddListener(OnPauseClicked);
+                SimulationManager.Instance.OnPauseStateChanged -= UpdatePauseButton;
+                SimulationManager.Instance.OnSpeedChanged -= UpdateSpeedText;
+                SimulationManager.Instance.OnTimeUpdated -= UpdateTimer;
             }
+        }
 
-            if (_btnMenu != null)
+        
+        private void UpdateStatsUI()
+        {
+            if (_textCompleted) _textCompleted.text = $"HOTOVO: {StatsManager.Instance.CompletedOrders}";
+            if (_textAvgTime) _textAvgTime.text = $"PRŮMĚR: {StatsManager.Instance.AverageDeliveryTime:F1}s";
+        }
+
+        private void UpdatePauseButton(bool isPaused)
+        {
+            if (_btnPlayPauseLabel != null)
             {
-                _btnMenu.onClick.AddListener(BackToMenu);
+                // Použijeme EMOJI pro moderní vzhled
+                _btnPlayPauseLabel.text = isPaused ? "PLAY" : "PAUSE"; 
+            }
+        }
+
+        private void UpdateSpeedText(float speed)
+        {
+            if (_speedValueText != null) _speedValueText.text = $"{speed}x";
+        }
+
+        private void UpdateTimer(float totalSeconds)
+        {
+            if (_textTimer != null)
+            {
+                TimeSpan t = TimeSpan.FromSeconds(totalSeconds);
+                
+                // Rich Text formátování pro hezčí vzhled
+                _textTimer.text = string.Format("{0:D2}:{1:D2} <size=60%><color=#AAAAAA></color></size>", 
+                                                t.Minutes, t.Seconds);
             }
         }
 
@@ -79,52 +137,34 @@ namespace Warehouse.UI
 
         private void OnSpeedChanged(float value)
         {
+            // Převedeme float ze slideru na int index (0, 1, 2, 3, 4)
+            int index = Mathf.RoundToInt(value);
+            
+            // Pojistka, abychom nesáhli mimo pole
+            index = Mathf.Clamp(index, 0, _speedSteps.Length - 1);
+
+            // Vybereme skutečnou rychlost z pole
+            float realSpeed = _speedSteps[index];
+
             if (SimulationManager.Instance != null)
             {
-                SimulationManager.Instance.SetSimulationSpeed(value);
+                SimulationManager.Instance.SetSimulationSpeed(realSpeed);
             }
-
-            // Aktualizace textu (např. "5x")
+            
+            // Aktualizujeme text (teď to bude ukazovat správně 0.5x, 8x atd.)
             if (_speedValueText != null)
             {
-                _speedValueText.text = $"{value}x";
+                _speedValueText.text = $"{realSpeed}x";
             }
         }
 
-        private void OnPauseClicked()
+        private void OnPlayPauseClicked()
         {
-            if (SimulationManager.Instance != null)
-            {
-                SimulationManager.Instance.TogglePause();
-
-                // Změna textu tlačítka
-                if (_pauseButtonText != null)
-                {
-                    bool isPaused = SimulationManager.Instance.IsPaused;
-                    _pauseButtonText.text = isPaused ? "PLAY" : "PAUSE";
-                }
-            }
+            SimulationManager.Instance.TogglePause();
         }
-
-        private void OnDestroy()
+        private void OnResetClicked()
         {
-            // Vždy se musíme odhlásit, abychom nezpůsobili memory leaks
-            if (StatsManager.Instance != null)
-            {
-                StatsManager.Instance.OnStatsChanged -= UpdateUI;
-            }
-        }
-
-        private void UpdateUI()
-        {
-            if (StatsManager.Instance == null) return;
-
-            // Zobrazení dat
-            if (_textCompleted != null)
-                _textCompleted.text = $"Hotovo: {StatsManager.Instance.CompletedOrders}";
-            
-            if (_textAvgTime != null)
-                _textAvgTime.text = $"Čas/Avg: {StatsManager.Instance.AverageDeliveryTime:F1} s";
+            SimulationManager.Instance.ResetSimulation();
         }
     }
 }

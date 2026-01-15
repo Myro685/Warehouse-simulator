@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using System;
 using Warehouse.Pathfinding;
 
 namespace Warehouse.Managers
@@ -13,8 +15,18 @@ namespace Warehouse.Managers
         // Aktuálně vybraný algoritmus (výchozí je A*)
         public PathAlgorithm CurrentAlgorithm { get; private set; } = PathAlgorithm.AStar;
 
+        // --- Stav simulace ---
         public bool IsPaused { get; private set; } = false;
-        private float _previousTimeScale = 1.0f;
+        public float SimulationSpeed { get; private set; } = 1.0f;
+        
+        // --- Time Tracking ---
+        // Celkový čas simulace v sekundách (ovlivněný zrychlením)
+        public float TotalTime { get; private set; } = 0f;
+
+        // UI se přihlásí k odběru těchto událostí
+        public event Action<bool> OnPauseStateChanged;
+        public event Action<float> OnSpeedChanged;
+        public event Action<float> OnTimeUpdated;
 
         private void Awake()
         {
@@ -24,6 +36,17 @@ namespace Warehouse.Managers
                 return;
             }
             Instance = this;
+
+            Time.timeScale = 1.0f;
+        }
+
+        public void Update()
+        {
+            if (!IsPaused)
+            {
+                TotalTime += Time.deltaTime;
+                OnTimeUpdated?.Invoke(TotalTime);
+            }
         }
 
         /// <summary>
@@ -46,11 +69,13 @@ namespace Warehouse.Managers
         /// </summary>
         public void SetSimulationSpeed(float speed)
         {
+            SimulationSpeed = speed;
             if (!IsPaused)
             {
                 Time.timeScale = speed;
             }
-            _previousTimeScale = speed; // Pamatujeme si rychlost pro odpauzování
+
+            OnSpeedChanged?.Invoke(speed);
         }
 
         /// <summary>
@@ -65,8 +90,21 @@ namespace Warehouse.Managers
                 Time.timeScale = 0f;
             } else
             {
-                Time.timeScale = _previousTimeScale;
+                Time.timeScale = SimulationSpeed;
             }
+
+            OnPauseStateChanged?.Invoke(IsPaused);
+        }
+
+        /// <summary>
+        /// Restartuje celou simulaci znovu načtením scény. 
+        /// </summary>
+        public void ResetSimulation()
+        {
+            // Získáme index aktuální scény a načteme ji znovu
+            // Tím se vyčistí všechny objekty, vozíky, statistiky a grid.
+            int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+            SceneManager.LoadScene(currentSceneIndex);
         }
     }
 }
