@@ -21,6 +21,7 @@ namespace Warehouse.UI
         [SerializeField] private Button _btnUnloading;
         [SerializeField] private Button _btnSpawnAgv;
         [SerializeField] private LevelStorageManager _storageManager;
+        [SerializeField] private Button _btnWaitingArea;
 
         private void Start()
         {
@@ -32,6 +33,7 @@ namespace Warehouse.UI
             _btnLoading.onClick.AddListener(()=> SelectTool(TileType.LoadingDock, _btnLoading));
             _btnUnloading.onClick.AddListener(()=> SelectTool(TileType.UnloadingDock, _btnUnloading));
             _btnSpawnAgv.onClick.AddListener(()=> {_levelEditor.SetSpawnMode();});
+            _btnWaitingArea.onClick.AddListener(() => SelectTool(TileType.WaitingArea, _btnWaitingArea));
         }
 
         private void SelectTool(TileType type, Button clickedButton)

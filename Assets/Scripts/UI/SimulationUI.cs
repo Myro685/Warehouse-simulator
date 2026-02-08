@@ -107,10 +107,7 @@ namespace Warehouse.UI
             // Fronta (Musíme získat z OrderManageru)
             if (_textQueue != null && OrderManager.Instance != null)
             {
-                 // Potřebuješ přidat property 'QueueCount' do OrderManageru!
-                 // Zatím to hardcoduji na 0, dokud to nepřidáš:
-                 // _textQueue.text = $"📦 Ve frontě: {OrderManager.Instance.QueueCount}";
-                 _textQueue.text = "Ve frontě: ?"; 
+                _textQueue.text = $"Ve frontě: {OrderManager.Instance.QueueCount}";
             }
         }
 
@@ -120,8 +117,8 @@ namespace Warehouse.UI
             {
                 TimeSpan t = TimeSpan.FromSeconds(totalSeconds);
                 float currentSpeed = SimulationManager.Instance.SimulationSpeed;
-                _textTimer.text = string.Format("{0:D2}:{1:D2} <size=60%><color=#AAAAAA></color></size>", 
-                                                t.Minutes, t.Seconds, currentSpeed);
+                _textTimer.text = string.Format("{0:D2}:{1:D2} <size=60%><color=#AAAAAA>({2}x)</color></size>", 
+                                t.Minutes, t.Seconds, currentSpeed);
             }
         }
 

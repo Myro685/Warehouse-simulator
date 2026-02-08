@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using Warehouse.Grid;
 using Warehouse.Pathfinding;
-using Warehouse.Core; 
+using Warehouse.Core;
+using UnityEngine.Tilemaps;
 
 namespace Warehouse.Units
 {
-    public enum AGVState { Idle, MovingToPickup, Loading, MovingToDelivery, Unloading } 
+    public enum AGVState { Idle, MovingToPickup, Loading, MovingToDelivery, Unloading, MovingToWaiting } 
 
     [RequireComponent(typeof(LineRenderer))]
     public class AGVController : MonoBehaviour
@@ -61,7 +62,6 @@ namespace Warehouse.Units
             } else
             {
                 Debug.LogWarning("Cesta je nulová nebo prázdná.");
-                onReached?.Invoke();
             }
         }
 
@@ -225,10 +225,49 @@ namespace Warehouse.Units
                 
                 // Po 2 sekundách vykládání:
                 Managers.OrderManager.Instance.CompleteOrder(_currentOrder);
-                
                 _currentOrder = null;
-                State = AGVState.Idle;
+
+                GoToWaitingArea();
             }));
+        }
+
+        private void GoToWaitingArea()
+        {
+            // Získáme všechna parkovací místa z GridManageru
+            var parkingSpots = Managers.GridManager.Instance.GetNodesByType(TileType.WaitingArea);
+
+            GridNode bestSpot = null;
+            float minDistance = float.MaxValue;
+
+            // Najdeme nejbližší VOLNÉ parkoviště
+            foreach (var spot in parkingSpots)
+            {
+                // Musí být volné a nesmí to být to, na kterém zrovna stojím (pokud bych už na parkovišti byl)
+                if (spot.IsAvailable(this))
+                {
+                    float dist = Vector3.Distance(transform.position, spot.WorldPosition);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        bestSpot = spot;
+                    }
+                }
+            }
+
+            if (bestSpot != null)
+            {
+                Debug.Log($"AGV {name} jede na parkoviště [{bestSpot.GridX},{bestSpot.GridY}]");
+                State = AGVState.MovingToWaiting;
+                SetDestination(bestSpot, () => {
+                    State = AGVState.Idle; // Až tam dojede, teprve pak je Idle
+                });
+            }
+            else
+            {
+                // Žádné volné parkoviště -> Zůstane stát tam, kde je (bohužel)
+                Debug.LogWarning("Žádné volné parkoviště! Zůstávám stát.");
+                State = AGVState.Idle;
+            }
         }
 
         private IEnumerator SimulateTaskDuration(float duration, System.Action onComplete)

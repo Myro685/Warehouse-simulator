@@ -24,6 +24,7 @@ namespace Warehouse.Managers
         [SerializeField] private GameObject _shelfPrefab;
         [SerializeField] private GameObject _loadingPrefab;
         [SerializeField] private GameObject _unloadingPrefab;
+        [SerializeField] private GameObject _waitingAreaPrefab;
 
         // Aktuálně vybraný typ pro stavbu
         private TileType _currentTool = TileType.Wall;
@@ -176,6 +177,7 @@ namespace Warehouse.Managers
                 case TileType.Shelf: return _shelfPrefab;
                 case TileType.LoadingDock: return _loadingPrefab;
                 case TileType.UnloadingDock: return _unloadingPrefab;
+                case TileType.WaitingArea: return _waitingAreaPrefab;
                 default: return null;
             }
         }

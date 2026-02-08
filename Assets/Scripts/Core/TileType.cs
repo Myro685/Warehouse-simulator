@@ -11,6 +11,7 @@ namespace Warehouse.Core
         Wall,
         Shelf,
         LoadingDock,
-        UnloadingDock
+        UnloadingDock,
+        WaitingArea
     }
 }
