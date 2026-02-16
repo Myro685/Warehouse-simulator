@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Warehouse.Core;
@@ -209,6 +210,9 @@ namespace Warehouse.Managers
 
             CreateOrder(pickup, delivery);
             Debug.Log($"LoadingDock vytvořil objednávku naskladnění #{_nextOrderId - 1}: LoadingDock → Shelf");
+            
+            // Vizuální feedback - zobrazíme efekt na LoadingDocku
+            StartCoroutine(ShowDockIndicator(pickup, Color.green));
         }
 
         /// <summary>
@@ -241,6 +245,9 @@ namespace Warehouse.Managers
 
             CreateOrder(pickup, delivery);
             Debug.Log($"UnloadingDock vytvořil objednávku vyskladnění #{_nextOrderId - 1}: Shelf → UnloadingDock");
+            
+            // Vizuální feedback - zobrazíme efekt na UnloadingDocku
+            StartCoroutine(ShowDockIndicator(delivery, Color.cyan));
         }
 
         /// <summary>
@@ -258,6 +265,56 @@ namespace Warehouse.Managers
             {
                 CreateOutboundOrder();
             }
+        }
+
+        /// <summary>
+        /// Zobrazí vizuální indikátor na docku při vytvoření objednávky.
+        /// </summary>
+        private IEnumerator ShowDockIndicator(GridNode dockNode, Color indicatorColor)
+        {
+            if (dockNode == null || dockNode.VisualObject == null) yield break;
+
+            MeshRenderer renderer = dockNode.VisualObject.GetComponent<MeshRenderer>();
+            if (renderer == null || renderer.material == null) yield break;
+
+            // Vytvoříme instanci materiálu pro tento dock
+            Material originalMaterial = renderer.material;
+            Material tempMaterial = new Material(originalMaterial);
+            renderer.material = tempMaterial;
+
+            Color originalColor = tempMaterial.color;
+            float duration = 1.0f; // Délka animace
+            int blinkCount = 3;
+            float blinkDuration = duration / blinkCount;
+
+            // Blikání efekt - 3x blikne
+            for (int i = 0; i < blinkCount; i++)
+            {
+                // Rozsvítíme
+                float elapsed = 0f;
+                while (elapsed < blinkDuration / 2)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / (blinkDuration / 2);
+                    tempMaterial.color = Color.Lerp(originalColor, indicatorColor, t);
+                    yield return null;
+                }
+
+                // Zhasneme
+                elapsed = 0f;
+                while (elapsed < blinkDuration / 2)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / (blinkDuration / 2);
+                    tempMaterial.color = Color.Lerp(indicatorColor, originalColor, t);
+                    yield return null;
+                }
+            }
+
+            // Vrátíme původní materiál
+            tempMaterial.color = originalColor;
+            renderer.material = originalMaterial;
+            Destroy(tempMaterial);
         }
     }
 }

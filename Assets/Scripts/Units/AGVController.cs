@@ -11,19 +11,45 @@ namespace Warehouse.Units
     public enum AGVState { Idle, MovingToPickup, Loading, MovingToDelivery, Unloading, MovingToWaiting } 
 
     [RequireComponent(typeof(LineRenderer))]
+    [RequireComponent(typeof(MeshRenderer))]
     public class AGVController : MonoBehaviour
     {
         [Header("Movement Settings")]
         [SerializeField] private float _moveSpeed = 2.0f;
 
+        [Header("Visual Settings")]
+        [SerializeField] private bool _enableStateColors = true;
+
         private LineRenderer _lineRenderer;
+        private MeshRenderer _meshRenderer;
+        private Material _materialInstance; // Instance materiálu pro tento vozík
+
+        // Barvy podle stavu
+        private readonly Color _colorIdle = new Color(0.5f, 0.5f, 0.5f); // Šedá
+        private readonly Color _colorMovingToPickup = new Color(1f, 0.84f, 0f); // Žlutá
+        private readonly Color _colorLoading = new Color(0f, 0.5f, 1f); // Modrá
+        private readonly Color _colorMovingToDelivery = new Color(0f, 1f, 0f); // Zelená
+        private readonly Color _colorUnloading = new Color(1f, 0f, 0f); // Červená
+        private readonly Color _colorMovingToWaiting = new Color(1f, 0.5f, 0f); // Oranžová
 
         private System.Action _onDestinationReached; 
 
         public GridNode CurrentNode { get; private set; }
         public bool IsMoving { get; private set; }
         
-        public AGVState State { get; private set; } = AGVState.Idle;
+        private AGVState _state = AGVState.Idle;
+        public AGVState State 
+        { 
+            get => _state;
+            private set 
+            {
+                if (_state != value)
+                {
+                    _state = value;
+                    UpdateVisualState();
+                }
+            }
+        }
         
         private Order _currentOrder; 
        
@@ -31,6 +57,26 @@ namespace Warehouse.Units
         {
             _lineRenderer = GetComponent<LineRenderer>();
             _lineRenderer.positionCount = 0;
+            
+            // Nastavení LineRendereru pro zobrazení cesty
+            _lineRenderer.startWidth = 0.1f;
+            _lineRenderer.endWidth = 0.1f;
+            _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+            _lineRenderer.startColor = new Color(1f, 0.84f, 0f, 0.7f); // Žlutá, poloprůhledná
+            _lineRenderer.endColor = new Color(1f, 0.84f, 0f, 0.7f); // Žlutá, poloprůhledná
+            _lineRenderer.sortingOrder = 1;
+            
+            _meshRenderer = GetComponent<MeshRenderer>();
+            
+            // Vytvoříme instanci materiálu pro tento vozík, abychom mohli měnit barvu bez ovlivnění ostatních
+            if (_meshRenderer != null && _meshRenderer.material != null)
+            {
+                _materialInstance = new Material(_meshRenderer.material);
+                _meshRenderer.material = _materialInstance;
+            }
+            
+            // Nastavíme počáteční barvu
+            UpdateVisualState();
         }
 
         public void Initialize(GridNode startNode)
@@ -72,16 +118,19 @@ namespace Warehouse.Units
             if (remainingPath == null || remainingPath.Count == 0)
             {
                 _lineRenderer.positionCount = 0;
+                _lineRenderer.enabled = false;
                 return;
             }
 
+            // Zobrazíme LineRenderer pouze pokud je cesta
+            _lineRenderer.enabled = true;
             _lineRenderer.positionCount = remainingPath.Count + 1;
             _lineRenderer.SetPosition(0, transform.position);
 
             for (int i = 0; i < remainingPath.Count; i++)
             {
                 Vector3 pos = remainingPath[i].WorldPosition;
-                pos.y = 0.5f;
+                pos.y = 0.5f; // Mírně nad zemí, aby byla cesta viditelná
                 _lineRenderer.SetPosition(i + 1, pos);
             }
         }
@@ -186,9 +235,31 @@ namespace Warehouse.Units
 
             IsMoving = false;
             _lineRenderer.positionCount = 0;
+            _lineRenderer.enabled = false; // Skryjeme cestu když dorazíme
             
             // Zavoláme uloženou akci (např. "Nakládám zboží")
             _onDestinationReached?.Invoke();
+        }
+
+        /// <summary>
+        /// Aktualizuje vizuální vzhled vozíku podle jeho stavu.
+        /// </summary>
+        private void UpdateVisualState()
+        {
+            if (!_enableStateColors || _materialInstance == null) return;
+
+            Color targetColor = _state switch
+            {
+                AGVState.Idle => _colorIdle,
+                AGVState.MovingToPickup => _colorMovingToPickup,
+                AGVState.Loading => _colorLoading,
+                AGVState.MovingToDelivery => _colorMovingToDelivery,
+                AGVState.Unloading => _colorUnloading,
+                AGVState.MovingToWaiting => _colorMovingToWaiting,
+                _ => _colorIdle
+            };
+
+            _materialInstance.color = targetColor;
         }
 
         public void AssignOrder(Order order)
@@ -226,10 +297,39 @@ namespace Warehouse.Units
                 
                 // Po 2 sekundách vykládání:
                 Managers.OrderManager.Instance.CompleteOrder(_currentOrder);
+                
+                // Vizuální feedback při dokončení objednávky
+                StartCoroutine(ShowCompletionEffect());
+                
                 _currentOrder = null;
 
                 GoToWaitingArea();
             }));
+        }
+
+        /// <summary>
+        /// Zobrazí vizuální efekt při dokončení objednávky.
+        /// </summary>
+        private IEnumerator ShowCompletionEffect()
+        {
+            if (_materialInstance == null) yield break;
+
+            Color originalColor = _materialInstance.color;
+            Color successColor = Color.green;
+            float duration = 0.5f;
+            float elapsed = 0f;
+
+            // Rychlé bliknutí zelenou barvou
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.PingPong(elapsed * 4f, 1f); // Blikání
+                _materialInstance.color = Color.Lerp(originalColor, successColor, t);
+                yield return null;
+            }
+
+            // Vrátíme původní barvu (podle stavu)
+            UpdateVisualState();
         }
 
         private void GoToWaitingArea()
@@ -289,6 +389,12 @@ namespace Warehouse.Units
             if (Managers.AgvManager.Instance != null)
             {
                 Managers.AgvManager.Instance.UnregisterAgv(this);
+            }
+
+            // 3. Uvolníme instanci materiálu
+            if (_materialInstance != null)
+            {
+                Destroy(_materialInstance);
             }
         }
 
