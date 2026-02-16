@@ -37,6 +37,12 @@ namespace Warehouse.Managers
         /// </summary>
         public void SpawnAgv(int x, int y)
         {
+            if (GridManager.Instance == null)
+            {
+                Debug.LogError("AgvManager: GridManager není inicializován!");
+                return;
+            }
+            
             GridNode node = GridManager.Instance.GetNode(x, y);
 
             if (node == null)

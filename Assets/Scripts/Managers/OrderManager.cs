@@ -316,5 +316,14 @@ namespace Warehouse.Managers
             renderer.material = originalMaterial;
             Destroy(tempMaterial);
         }
+        
+        private void OnDestroy()
+        {
+            // Zastav všechny běžící coroutines aby se uvolnily Materialy
+            StopAllCoroutines();
+            
+            // Odhlas všechny eventy
+            OnQueueChanged = null;
+        }
     }
 }

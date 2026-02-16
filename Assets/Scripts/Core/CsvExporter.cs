@@ -31,7 +31,13 @@ namespace Warehouse.Core
 
         private static string GetPath()
         {
-            return Path.Combine(Application.dataPath, "../", _filePath);
+            #if UNITY_EDITOR
+                // V editoru ukládáme vedle Assets složky
+                return Path.Combine(Application.dataPath, "../", _filePath);
+            #else
+                // V buildu ukládáme do persistent data path
+                return Path.Combine(Application.persistentDataPath, _filePath);
+            #endif
         }
     }
 }
