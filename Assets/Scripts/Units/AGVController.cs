@@ -22,17 +22,18 @@ namespace Warehouse.Units
 
         private LineRenderer _lineRenderer;
         private MeshRenderer _meshRenderer;
-        private Material _materialInstance; // Instance materiálu pro tento vozík
+        private Material _materialInstance;
 
         // Barvy podle stavu
-        private readonly Color _colorIdle = new Color(0.5f, 0.5f, 0.5f); // Šedá
-        private readonly Color _colorMovingToPickup = new Color(1f, 0.84f, 0f); // Žlutá
-        private readonly Color _colorLoading = new Color(0f, 0.5f, 1f); // Modrá
-        private readonly Color _colorMovingToDelivery = new Color(0f, 1f, 0f); // Zelená
-        private readonly Color _colorUnloading = new Color(1f, 0f, 0f); // Červená
-        private readonly Color _colorMovingToWaiting = new Color(1f, 0.5f, 0f); // Oranžová
+        private readonly Color _colorIdle = new Color(0.5f, 0.5f, 0.5f);
+        private readonly Color _colorMovingToPickup = new Color(1f, 0.84f, 0f);
+        private readonly Color _colorLoading = new Color(0f, 0.5f, 1f);
+        private readonly Color _colorMovingToDelivery = new Color(0f, 1f, 0f);
+        private readonly Color _colorUnloading = new Color(1f, 0f, 0f);
+        private readonly Color _colorMovingToWaiting = new Color(1f, 0.5f, 0f);
 
         private System.Action _onDestinationReached; 
+        private GridNode _finalDestinationNode; // Pamatujeme si, kam chceme dojet
 
         public GridNode CurrentNode { get; private set; }
         public bool IsMoving { get; private set; }
@@ -57,25 +58,19 @@ namespace Warehouse.Units
         {
             _lineRenderer = GetComponent<LineRenderer>();
             _lineRenderer.positionCount = 0;
-            
-            // Nastavení LineRendereru pro zobrazení cesty
             _lineRenderer.startWidth = 0.1f;
             _lineRenderer.endWidth = 0.1f;
             _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-            _lineRenderer.startColor = new Color(1f, 0.84f, 0f, 0.7f); // Žlutá, poloprůhledná
-            _lineRenderer.endColor = new Color(1f, 0.84f, 0f, 0.7f); // Žlutá, poloprůhledná
+            _lineRenderer.startColor = new Color(1f, 0.84f, 0f, 0.7f);
+            _lineRenderer.endColor = new Color(1f, 0.84f, 0f, 0.7f);
             _lineRenderer.sortingOrder = 1;
             
             _meshRenderer = GetComponent<MeshRenderer>();
-            
-            // Vytvoříme instanci materiálu pro tento vozík, abychom mohli měnit barvu bez ovlivnění ostatních
             if (_meshRenderer != null && _meshRenderer.material != null)
             {
                 _materialInstance = new Material(_meshRenderer.material);
                 _meshRenderer.material = _materialInstance;
             }
-            
-            // Nastavíme počáteční barvu
             UpdateVisualState();
         }
 
@@ -90,24 +85,37 @@ namespace Warehouse.Units
         public void SetDestination(GridNode targetNode, System.Action onReached = null)
         {
             _onDestinationReached = onReached;
+            _finalDestinationNode = targetNode; // Uložíme si cíl pro případné opakování
             
-            // Pokud SimulationManager ještě neexistuje (např. při testech), použijeme default A*
             PathAlgorithm algo = PathAlgorithm.AStar;
             if (Managers.SimulationManager.Instance != null)
             {
                 algo = Managers.SimulationManager.Instance.CurrentAlgorithm;
             }
 
-            // Předáme algoritmus do Pathfindera
             List<GridNode> path = Pathfinder.FindPath(CurrentNode, targetNode, algo);
 
             if (path != null && path.Count > 0)
             {
                 StopAllCoroutines();
                 StartCoroutine(FollowPath(path));
-            } else
+            } 
+            else
             {
-                Debug.LogWarning("Cesta je nulová nebo prázdná.");
+                // DŮLEŽITÁ OPRAVA: Pokud cesta není, nevzdáváme to! Zkusíme to za chvíli znovu.
+                Debug.LogWarning($"AGV {name}: Cesta k cíli nenalezena! Zkusím to znovu za 1s.");
+                StopAllCoroutines(); // Zastavíme pohyb, pokud nějaký byl
+                StartCoroutine(RetryDestination(1.0f)); 
+            }
+        }
+
+        // Coroutina pro opakování pokusu o nalezení cesty
+        private IEnumerator RetryDestination(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            if (_finalDestinationNode != null)
+            {
+                SetDestination(_finalDestinationNode, _onDestinationReached);
             }
         }
 
@@ -122,7 +130,6 @@ namespace Warehouse.Units
                 return;
             }
 
-            // Zobrazíme LineRenderer pouze pokud je cesta
             _lineRenderer.enabled = true;
             _lineRenderer.positionCount = remainingPath.Count + 1;
             _lineRenderer.SetPosition(0, transform.position);
@@ -130,7 +137,7 @@ namespace Warehouse.Units
             for (int i = 0; i < remainingPath.Count; i++)
             {
                 Vector3 pos = remainingPath[i].WorldPosition;
-                pos.y = 0.5f; // Mírně nad zemí, aby byla cesta viditelná
+                pos.y = 0.5f;
                 _lineRenderer.SetPosition(i + 1, pos);
             }
         }
@@ -141,44 +148,50 @@ namespace Warehouse.Units
             List<GridNode> activePath = new List<GridNode>(path);
             UpdatePathVisual(activePath);
 
-            // 1. Zarezervujeme si startovní pozici (kde právě stojíme)
+            // Rezervace startu
             if (CurrentNode.OccupiedBy == null) CurrentNode.OccupiedBy = this;
 
             while (activePath.Count > 0)
             {
                 GridNode targetNode = activePath[0];
 
-                
-                // --- KOLIZNÍ LOGIKA: Čekání na uvolnění ---
-                // Pokud je cílový uzel obsazený NĚKÝM JINÝM, čekáme
+                // --- KOLIZNÍ LOGIKA ---
                 if (!targetNode.IsAvailable(this))
                 {
                     if (Managers.StatsManager.Instance != null)
-                    {
                         Managers.StatsManager.Instance.RegisterCollision();
-                    }
                     
                     float waitTimer = 0f;
-                    // Čekáme max 2 sekundy (pro plynulost)
+                    // Náhodná složka čekání, aby se neodblokovali všichni naráz (0-0.5s navíc)
+                    float maxWaitTime = 2.0f + Random.Range(0f, 0.5f); 
+
+                    if (_currentOrder != null)
+                    {
+                        _currentOrder.CollisionCount++;
+                    }
                     while (!targetNode.IsAvailable(this))
                     {
                         waitTimer += Time.deltaTime;
 
-                        // Pokud čekáme moc dlouho -> REROUTE (Přepočet)
-                        if (waitTimer > 2.0f)
+                        // REROUTE
+                        if (waitTimer > maxWaitTime)
                         {
-                            Debug.LogWarning($"AGV {name} je zablokován na [{targetNode.GridX},{targetNode.GridY}]. Přepočítávám trasu...");
+                            Debug.Log($"AGV {name}: Zablokován na [{CurrentNode.GridX},{CurrentNode.GridY}]. Přepočítávám...");
                             IsMoving = false;
-
-                            GridNode finalDestination = activePath[activePath.Count - 1];
-                            SetDestination(finalDestination, _onDestinationReached);
-                            yield break;
+                            
+                            // Zkusíme najít cestu znova do PŮVODNÍHO cíle (_finalDestinationNode)
+                            // Místo toho, abychom jeli jen na konec aktuální path, která může být zastaralá
+                            if (_finalDestinationNode != null)
+                            {
+                                SetDestination(_finalDestinationNode, _onDestinationReached);
+                            }
+                            yield break; // Ukončíme TUTO coroutinu, SetDestination spustí novou
                         }
                         yield return null;
                     }
                 }
 
-                // Uzel je volný -> Zarezervujeme si ho
+                // Rezervace
                 targetNode.OccupiedBy = this;
                 
                 Vector3 startPos = transform.position;
@@ -189,61 +202,52 @@ namespace Warehouse.Units
 
                 float journeyLength = Vector3.Distance(startPos, endPos);
                 float startTime = Time.time;
-
-                // Vypočítáme vzdálenost jednou před pohybem (ne každý frame)
                 float distanceTraveled = Vector3.Distance(CurrentNode.WorldPosition, targetNode.WorldPosition);
 
-                // Pohyb k aktuálnímu cíli (jednomu nodu)
                 while (Vector3.Distance(transform.position, endPos) > 0.01f)
                 {
                     float distCovered = (Time.time - startTime) * _moveSpeed;
                     float fractionOfJourney = distCovered / journeyLength;
-
                     transform.position = Vector3.Lerp(startPos, endPos, fractionOfJourney);
                     
-                    if (_lineRenderer.positionCount > 0)
-                    {
+                    if (_lineRenderer.positionCount > 0) 
                         _lineRenderer.SetPosition(0, transform.position);
-                    }
 
-                    yield return null; // Čekáme na další frame
+                    yield return null;
                 }
 
-                // Jsme v uzlu - přidáme vzdálenost až když jsme skutečně dorazili
                 transform.position = endPos;
                 
                 if (Managers.StatsManager.Instance != null)
                 {
                     Managers.StatsManager.Instance.AddDistance(distanceTraveled);
-                    
-                    // Čas pohybu (přibližně): distance / speed
                     Managers.StatsManager.Instance.AddMovingTime(distanceTraveled / _moveSpeed);
                 }
 
+                if (_currentOrder != null)
+                {
+                    _currentOrder.RealDistance += distanceTraveled;
+                }
+
+                // Uvolnění starého nodu
                 if (CurrentNode != targetNode && CurrentNode.OccupiedBy == this)
                 {
                     CurrentNode.OccupiedBy = null;
                 }
 
                 targetNode.AddVisit();
-        
                 CurrentNode = targetNode;
-
                 activePath.RemoveAt(0);
                 UpdatePathVisual(activePath);
             }
 
             IsMoving = false;
             _lineRenderer.positionCount = 0;
-            _lineRenderer.enabled = false; // Skryjeme cestu když dorazíme
+            _lineRenderer.enabled = false;
             
-            // Zavoláme uloženou akci (např. "Nakládám zboží")
             _onDestinationReached?.Invoke();
         }
 
-        /// <summary>
-        /// Aktualizuje vizuální vzhled vozíku podle jeho stavu.
-        /// </summary>
         private void UpdateVisualState()
         {
             if (!_enableStateColors || _materialInstance == null) return;
@@ -265,25 +269,20 @@ namespace Warehouse.Units
         public void AssignOrder(Order order)
         {
             _currentOrder = order;
-            _currentOrder.Status = OrderStatus.Assigned; // Opraven překlep
+            _currentOrder.Status = OrderStatus.Assigned; 
 
             State = AGVState.MovingToPickup;
-            // Řekneme: Jeď na Pickup a AŽ TAM DOJEDEŠ, spusť OnPickupReached
             SetDestination(order.PickupNode, OnPickupReached);
         }
 
         private void OnPickupReached()
         {
             Debug.Log("Jsem na místě vyzvednutí. Nakládám...");
-            State = AGVState.Loading; // Aktualizace stavu
+            State = AGVState.Loading;
 
             StartCoroutine(SimulateTaskDuration(2.0f, () => {
-                
-                // Po 2 sekundách nakládání:
                 State = AGVState.MovingToDelivery;
                 _currentOrder.Status = OrderStatus.PickedUp;
-                
-                // Řekneme: Jeď na Delivery a AŽ TAM DOJEDEŠ, spusť OnDeliveryReached
                 SetDestination(_currentOrder.DeliveryNode, OnDeliveryReached);
             }));
         }
@@ -291,59 +290,41 @@ namespace Warehouse.Units
         private void OnDeliveryReached()
         {
             Debug.Log("Jsem v cíli. Vykládám...");
-            State = AGVState.Unloading; // Aktualizace stavu
+            State = AGVState.Unloading;
 
             StartCoroutine(SimulateTaskDuration(2.0f, () => {
-                
-                // Po 2 sekundách vykládání:
                 Managers.OrderManager.Instance.CompleteOrder(_currentOrder);
-                
-                // Vizuální feedback při dokončení objednávky
                 StartCoroutine(ShowCompletionEffect());
-                
                 _currentOrder = null;
-
                 GoToWaitingArea();
             }));
         }
 
-        /// <summary>
-        /// Zobrazí vizuální efekt při dokončení objednávky.
-        /// </summary>
         private IEnumerator ShowCompletionEffect()
         {
             if (_materialInstance == null) yield break;
-
             Color originalColor = _materialInstance.color;
             Color successColor = Color.green;
             float duration = 0.5f;
             float elapsed = 0f;
-
-            // Rychlé bliknutí zelenou barvou
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.PingPong(elapsed * 4f, 1f); // Blikání
+                float t = Mathf.PingPong(elapsed * 4f, 1f); 
                 _materialInstance.color = Color.Lerp(originalColor, successColor, t);
                 yield return null;
             }
-
-            // Vrátíme původní barvu (podle stavu)
             UpdateVisualState();
         }
 
         private void GoToWaitingArea()
         {
-            // Získáme všechna parkovací místa z GridManageru
             var parkingSpots = Managers.GridManager.Instance.GetNodesByType(TileType.WaitingArea);
-
             GridNode bestSpot = null;
             float minDistance = float.MaxValue;
 
-            // Najdeme nejbližší VOLNÉ parkoviště
             foreach (var spot in parkingSpots)
             {
-                // Musí být volné a nesmí to být to, na kterém zrovna stojím (pokud bych už na parkovišti byl)
                 if (spot.IsAvailable(this))
                 {
                     float dist = Vector3.Distance(transform.position, spot.WorldPosition);
@@ -357,15 +338,13 @@ namespace Warehouse.Units
 
             if (bestSpot != null)
             {
-                Debug.Log($"AGV {name} jede na parkoviště [{bestSpot.GridX},{bestSpot.GridY}]");
                 State = AGVState.MovingToWaiting;
                 SetDestination(bestSpot, () => {
-                    State = AGVState.Idle; // Až tam dojede, teprve pak je Idle
+                    State = AGVState.Idle; 
                 });
             }
             else
             {
-                // Žádné volné parkoviště -> Zůstane stát tam, kde je (bohužel)
                 Debug.LogWarning("Žádné volné parkoviště! Zůstávám stát.");
                 State = AGVState.Idle;
             }
@@ -379,24 +358,18 @@ namespace Warehouse.Units
 
         private void OnDestroy()
         {
-            // 1. Uvolni místo na Gridu
             if (CurrentNode != null && CurrentNode.OccupiedBy == this)
             {
                 CurrentNode.OccupiedBy = null;
             }
-
-            // 2. Odhlas se z AgvManageru (NOVÉ)
             if (Managers.AgvManager.Instance != null)
             {
                 Managers.AgvManager.Instance.UnregisterAgv(this);
             }
-
-            // 3. Uvolníme instanci materiálu
             if (_materialInstance != null)
             {
                 Destroy(_materialInstance);
             }
         }
-
     }
 }

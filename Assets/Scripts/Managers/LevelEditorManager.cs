@@ -34,6 +34,11 @@ namespace Warehouse.Managers
             // Ochrana proti klikání do UI (aby se nekreslilo skrz tlačítka)
             if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
 
+            if (SimulationManager.Instance != null && !SimulationManager.Instance.IsPaused)
+            {
+                return;
+            }
+            
             // Logika podle režimu
             if (_currentMode == EditorMode.SpawnUnit)
             {

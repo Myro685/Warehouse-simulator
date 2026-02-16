@@ -28,6 +28,10 @@ namespace Warehouse.Grid
         // Čas vytvoření (pro statistiky)
         public float CreationTime {get; private set;}
 
+        // Počet kolizí s ostatními vozíky
+        public int CollisionCount {get; set;} = 0;
+        public float RealDistance {get; set;} = 0f;
+
         public Order(int id, GridNode pickup, GridNode delivery)
         {
             OrderId = id;
@@ -35,6 +39,8 @@ namespace Warehouse.Grid
             DeliveryNode = delivery;
             Status = OrderStatus.Pending;
             CreationTime = UnityEngine.Time.time;
+            RealDistance = 0f;
+            CollisionCount = 0;
         }
     }
 }

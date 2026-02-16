@@ -1,6 +1,8 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 using Warehouse.Core;
 using Warehouse.Grid;
 using Warehouse.Units;
@@ -34,6 +36,9 @@ namespace Warehouse.Managers
 
         // Seznam aktivních objednávek (pro přehled)
         private List<Order> _activeOrders = new List<Order>();
+        
+        // Událost pro UI - když se změní fronta
+        public event Action OnQueueChanged;
 
         private int _nextOrderId = 1;
 
@@ -164,13 +169,12 @@ namespace Warehouse.Managers
                 {
                     algoName = SimulationManager.Instance.CurrentAlgorithm.ToString();
                 }
-
                 CsvExporter.WriteRow(
                     order.OrderId,
                     algoName,
-                    0, // TODO: Vylepšení - ukládat vzdálenost do Orderu
+                    order.RealDistance,   
                     duration,
-                    0, // TODO: Vylepšení - ukládat kolize do Orderu
+                    order.CollisionCount, 
                     order.CreationTime,
                     Time.time
                 );

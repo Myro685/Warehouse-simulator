@@ -6609,7 +6609,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Warehouse.Managers.OrderManager
   _autoGenerateOrders: 0
-  _orderGenerationInterval: 5
+  _enableLoadingDockOrders: 0
+  _loadingDockInterval: 8
+  _enableUnloadingDockOrders: 0
+  _unloadingDockInterval: 10
 --- !u!114 &1936779289
 MonoBehaviour:
   m_ObjectHideFlags: 0
