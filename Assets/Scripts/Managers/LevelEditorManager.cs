@@ -2,7 +2,6 @@ using UnityEngine;
 using Warehouse.Grid;
 using Warehouse.Core;
 using UnityEngine.Tilemaps;
-using UnityEngine.XR;
 
 namespace Warehouse.Managers
 {
@@ -98,12 +97,8 @@ namespace Warehouse.Managers
                         }
                         else if (_currentMode == EditorMode.SpawnUnit)
                         {
-                            // Spawnujeme pouze při kliknutí (GetMouseButtonDown), ne při tažení
-                            // Abychom nespawnuli 50 vozíků na sebe
-                            if (Input.GetMouseButton(0))
-                            {
-                                Managers.AgvManager.Instance.SpawnAgv(node.GridX, node.GridY);
-                            }
+                            // Spawnujeme vozík (GetMouseButtonDown je už kontrolováno v Update)
+                            Managers.AgvManager.Instance.SpawnAgv(node.GridX, node.GridY);
                         }
                     }
                 }

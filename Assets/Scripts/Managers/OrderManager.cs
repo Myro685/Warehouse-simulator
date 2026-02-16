@@ -14,10 +14,18 @@ namespace Warehouse.Managers
     {
         public static OrderManager Instance {get; private set;}
 
-        [Header("Setting")]
-        [SerializeField] private bool _autoGenerateOrders = false;
-        [SerializeField] private float _orderGenerationInterval = 5f;
-        private float _timer = 0f;
+        [Header("Order Generation Settings")]
+        [SerializeField] private bool _autoGenerateOrders = true;
+        
+        [Header("Loading Dock (Naskladnění)")]
+        [SerializeField] private bool _enableLoadingDockOrders = true;
+        [SerializeField] private float _loadingDockInterval = 8f; // Jak často LoadingDock generuje objednávky
+        private float _loadingDockTimer = 0f;
+        
+        [Header("Unloading Dock (Vyskladnění)")]
+        [SerializeField] private bool _enableUnloadingDockOrders = true;
+        [SerializeField] private float _unloadingDockInterval = 10f; // Jak často UnloadingDock generuje objednávky
+        private float _unloadingDockTimer = 0f;
 
         // Fronta čekajících objednávek
         private Queue<Order> _orderQueue = new Queue<Order>();
@@ -43,34 +51,52 @@ namespace Warehouse.Managers
             // Každý frame zkusíme přiřadit čekající objednávky
             AssignOrders();
 
-            // Manuální test (Klávesa O)
+            // Manuální test (Klávesa O - vytvoří náhodnou objednávku)
             if (Input.GetKeyDown(KeyCode.O))
             {
-                 CreateLogisticOrder();
+                CreateRandomOrder();
             }
 
-            // Automatické generování (pokud je zapnuto)
+            // Automatické generování objednávek (pokud je zapnuto)
             if (_autoGenerateOrders)
             {
-                _timer += Time.deltaTime;
-                if (_timer >= _orderGenerationInterval)
+                // LoadingDock generuje objednávky naskladnění
+                if (_enableLoadingDockOrders)
                 {
-                    _timer = 0f;
-                    CreateLogisticOrder();
+                    _loadingDockTimer += Time.deltaTime;
+                    if (_loadingDockTimer >= _loadingDockInterval)
+                    {
+                        _loadingDockTimer = 0f;
+                        CreateInboundOrder(); // LoadingDock → Shelf
+                    }
+                }
+
+                // UnloadingDock generuje objednávky vyskladnění
+                if (_enableUnloadingDockOrders)
+                {
+                    _unloadingDockTimer += Time.deltaTime;
+                    if (_unloadingDockTimer >= _unloadingDockInterval)
+                    {
+                        _unloadingDockTimer = 0f;
+                        CreateOutboundOrder(); // Shelf → UnloadingDock
+                    }
                 }
             }
         }
 
         private GridNode GetRandomWalkableNode()
         {
+            GridManager grid = GridManager.Instance;
+            if (grid == null) return null;
+            
             // Zkusíme 10x náhodně trefit volné místo. 
             // (V reálné aplikaci by to chtělo sofistikovanější výběr, ale pro test stačí).
             for (int i = 0; i < 10; i++)
             {
-                int x = Random.Range(0, 20); // Změň podle velikosti gridu, pokud ji máš dynamickou
-                int y = Random.Range(0, 20);
+                int x = Random.Range(0, grid.Width);
+                int y = Random.Range(0, grid.Height);
                 
-                GridNode node = GridManager.Instance.GetNode(x, y);
+                GridNode node = grid.GetNode(x, y);
                 if (node != null && node.IsWalkable())
                 {
                     return node;
@@ -153,54 +179,85 @@ namespace Warehouse.Managers
             }
         }
 
-        private void CreateLogisticOrder()
+        /// <summary>
+        /// Vytvoří objednávku naskladnění (LoadingDock → Shelf).
+        /// Voláno automaticky LoadingDockem.
+        /// </summary>
+        private void CreateInboundOrder()
         {
             GridManager grid = GridManager.Instance;
+            if (grid == null) return;
 
-            // Získáme všechny důležité body
             List<GridNode> shelves = grid.GetNodesByType(TileType.Shelf);
             List<GridNode> loadingDocks = grid.GetNodesByType(TileType.LoadingDock);
-            List<GridNode> unloadingDocks = grid.GetNodesByType(TileType.UnloadingDock);
 
-            // Pokud nemáme dostatek bodů, nelze vytvořit logistickou trasu
-            if (shelves.Count == 0)
+            if (loadingDocks.Count == 0)
             {
-                Debug.LogWarning("Nelze generovat objednávku: Žádné regály (Shelf).");
+                Debug.LogWarning("Nelze vytvořit objednávku naskladnění: Žádné LoadingDocky.");
                 return;
             }
 
-            GridNode pickup = null;
-            GridNode delivery = null;
-
-            // Náhodně rozhodneme typ úlohy (50/50)
-            // Typ A: Naskladnění (Příjem -> Regál)
-            // Typ B: Vyskladnění (Regál -> Výdej)
-
-            bool isInBound = Random.value > 0.5f;
-
-            if (isInBound && loadingDocks.Count > 0)
+            if (shelves.Count == 0)
             {
-                // NASKLADNĚNÍ: Vyber náhodný příjem a náhodný regál
-                pickup = loadingDocks[Random.Range(0, loadingDocks.Count)];
-                delivery = shelves[Random.Range(0, shelves.Count)];
-                Debug.Log("Generuji NASKLADNĚNÍ (Loading -> Shelf)");
+                Debug.LogWarning("Nelze vytvořit objednávku naskladnění: Žádné regály (Shelf).");
+                return;
             }
-            else if (!isInBound && unloadingDocks.Count > 0)
+
+            // Vybereme náhodný LoadingDock a náhodný regál
+            GridNode pickup = loadingDocks[Random.Range(0, loadingDocks.Count)];
+            GridNode delivery = shelves[Random.Range(0, shelves.Count)];
+
+            CreateOrder(pickup, delivery);
+            Debug.Log($"LoadingDock vytvořil objednávku naskladnění #{_nextOrderId - 1}: LoadingDock → Shelf");
+        }
+
+        /// <summary>
+        /// Vytvoří objednávku vyskladnění (Shelf → UnloadingDock).
+        /// Voláno automaticky UnloadingDockem.
+        /// </summary>
+        private void CreateOutboundOrder()
+        {
+            GridManager grid = GridManager.Instance;
+            if (grid == null) return;
+
+            List<GridNode> shelves = grid.GetNodesByType(TileType.Shelf);
+            List<GridNode> unloadingDocks = grid.GetNodesByType(TileType.UnloadingDock);
+
+            if (unloadingDocks.Count == 0)
             {
-                // VYSKLADNĚNÍ: Vyber náhodný regál a náhodný výdej
-                pickup = shelves[Random.Range(0, shelves.Count)];
-                delivery = unloadingDocks[Random.Range(0, unloadingDocks.Count)];
-                Debug.Log("Generuji VYSKLADNĚNÍ (Shelf -> Unloading)");
+                Debug.LogWarning("Nelze vytvořit objednávku vyskladnění: Žádné UnloadingDocky.");
+                return;
+            }
+
+            if (shelves.Count == 0)
+            {
+                Debug.LogWarning("Nelze vytvořit objednávku vyskladnění: Žádné regály (Shelf).");
+                return;
+            }
+
+            // Vybereme náhodný regál a náhodný UnloadingDock
+            GridNode pickup = shelves[Random.Range(0, shelves.Count)];
+            GridNode delivery = unloadingDocks[Random.Range(0, unloadingDocks.Count)];
+
+            CreateOrder(pickup, delivery);
+            Debug.Log($"UnloadingDock vytvořil objednávku vyskladnění #{_nextOrderId - 1}: Shelf → UnloadingDock");
+        }
+
+        /// <summary>
+        /// Vytvoří náhodnou objednávku (pro testování klávesou O).
+        /// </summary>
+        private void CreateRandomOrder()
+        {
+            bool isInBound = Random.value > 0.5f;
+            
+            if (isInBound)
+            {
+                CreateInboundOrder();
             }
             else
             {
-                // Fallback, pokud chybí docky
-                Debug.LogWarning("Chybí Loading nebo Unloading docky pro generování trasy.");
-                return;
+                CreateOutboundOrder();
             }
-
-            // Vytvoření objednávky
-            CreateOrder(pickup, delivery);
         }
     }
 }

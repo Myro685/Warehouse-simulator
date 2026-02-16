@@ -36,6 +36,10 @@ namespace Warehouse.Pathfinding
             // CLOSED SET: Již prozkoumané uzly 
             HashSet<GridNode> closedSet = new HashSet<GridNode>();
 
+            // Inicializace startního uzlu (resetujeme jeho pathfinding data)
+            startNode.GCost = 0;
+            startNode.HCost = algorithm == PathAlgorithm.AStar ? GetDistance(startNode, targetNode) : 0;
+            startNode.Parent = null;
             openSet.Add(startNode);
 
             while (openSet.Count > 0)
@@ -70,6 +74,20 @@ namespace Warehouse.Pathfinding
                     if (!neighbor.IsWalkable() || closedSet.Contains(neighbor) || isOccupiedByOther)
                     {
                         continue;
+                    }
+
+                    // Resetujeme pathfinding data souseda, pokud ještě nebyl inicializován v tomto běhu
+                    // (kontrolujeme, zda není v closedSet a zda má výchozí hodnoty)
+                    if (!closedSet.Contains(neighbor) && neighbor != startNode)
+                    {
+                        // Pokud GCost je 0 (může být z předchozího běhu, kde byl tento uzel startem),
+                        // resetujeme ho na MaxValue pro správný výpočet
+                        if (neighbor.GCost == 0)
+                        {
+                            neighbor.GCost = int.MaxValue;
+                            neighbor.HCost = 0;
+                            neighbor.Parent = null;
+                        }
                     }
 
                     // Cena cesty k sousedovi = GCost aktuálního + vzdálenost (zde vždy 1)

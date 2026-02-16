@@ -15,10 +15,14 @@ namespace Warehouse.Managers
         public static GridManager Instance {get; private set;}
 
         [Header("Grid Settings")]
-        [SerializeField] public int _width = 20; // Šířka skladu
-        [SerializeField] public int _height = 20; // Délka skladu
+        [SerializeField] private int _width = 20; // Šířka skladu
+        [SerializeField] private int _height = 20; // Délka skladu
         [SerializeField] private float _cellSize = 1.0f; // Velikost jedné buňky v Unity jednotkách
         [SerializeField] private Vector3 _originPosition = Vector3.zero; // Počátek mřížky
+
+        // Veřejné vlastnosti pro přístup k rozměrům
+        public int Width => _width;
+        public int Height => _height;
 
         // Hlavní datová struktura - 2D pole objektů GridNode
         private GridNode[,] _grid;

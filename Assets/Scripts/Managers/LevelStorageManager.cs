@@ -26,9 +26,9 @@ namespace Warehouse.Managers
 
             // 1. Příprava dat (Mapping)
             LevelData data = new LevelData();
-            // Poznámka: Zde předpokládáme fixní velikost gridu, v pokročilé verzi bychom ji četli z GridManageru
-            data.width = 20;
-            data.height = 20;
+            // Čteme velikost gridu z GridManageru místo hardcoded hodnoty
+            data.width = gridManager.Width;
+            data.height = gridManager.Height;
 
             // Projdeme celý grid a uložíme jen ty buňky, které nejsou prázdné
             for (int x = 0; x < data.width; x++)
@@ -109,10 +109,12 @@ namespace Warehouse.Managers
         public void ClearLevel()
         {
             GridManager gridManager = GridManager.Instance;
+            if (gridManager == null) return;
+            
             // Projdeme grid a vše nastavíme na Empty
-            for (int x = 0; x < 20; x++)
+            for (int x = 0; x < gridManager.Width; x++)
             {
-                for (int y = 0; y < 20; y++)
+                for (int y = 0; y < gridManager.Height; y++)
                 {
                     GridNode node = gridManager.GetNode(x, y);
                     if (node != null)

@@ -75,15 +75,17 @@ namespace Warehouse.Managers
             }
         }
 
-        // Přidej do Update v AgvManager.cs (jen pro testování!):
+        // Debug kód pro testování (zakomentováno pro produkci)
+        // Odkomentuj, pokud potřebuješ testovat pohyb vozíků klávesou T
+        /*
         private void Update()
         {
             // Když zmáčkneš klávesu T, první vozík pojede na náhodné volné místo
             if (Input.GetKeyDown(KeyCode.T) && _activeAgvs.Count > 0)
             {
                 // Najdi náhodné souřadnice
-                int x = Random.Range(0, 20);
-                int y = Random.Range(0, 20);
+                int x = Random.Range(0, GridManager.Instance.Width);
+                int y = Random.Range(0, GridManager.Instance.Height);
                 GridNode target = GridManager.Instance.GetNode(x, y);
 
                 if (target != null && target.IsWalkable())
@@ -93,6 +95,7 @@ namespace Warehouse.Managers
                 }
             }
         }
+        */
 
         /// <summary>
         /// Najde první vozík, který nic nedělá.

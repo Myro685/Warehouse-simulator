@@ -141,12 +141,14 @@ namespace Warehouse.Units
                 float journeyLength = Vector3.Distance(startPos, endPos);
                 float startTime = Time.time;
 
+                // Vypočítáme vzdálenost jednou před pohybem (ne každý frame)
+                float distanceTraveled = Vector3.Distance(CurrentNode.WorldPosition, targetNode.WorldPosition);
+
                 // Pohyb k aktuálnímu cíli (jednomu nodu)
                 while (Vector3.Distance(transform.position, endPos) > 0.01f)
                 {
                     float distCovered = (Time.time - startTime) * _moveSpeed;
                     float fractionOfJourney = distCovered / journeyLength;
-                    float distStep = Vector3.Distance(transform.position, endPos);
 
                     transform.position = Vector3.Lerp(startPos, endPos, fractionOfJourney);
                     
@@ -155,20 +157,19 @@ namespace Warehouse.Units
                         _lineRenderer.SetPosition(0, transform.position);
                     }
 
-                    float distanceTraveled = Vector3.Distance(CurrentNode.WorldPosition, targetNode.WorldPosition);
-                    if (Managers.StatsManager.Instance != null)
-                    {
-                        Managers.StatsManager.Instance.AddDistance(distanceTraveled);
-                        
-                        // Čas pohybu (přibližně): distance / speed
-                        Managers.StatsManager.Instance.AddMovingTime(distanceTraveled / _moveSpeed);
-                    }
-
                     yield return null; // Čekáme na další frame
                 }
 
-                // Jsme v uzlu
+                // Jsme v uzlu - přidáme vzdálenost až když jsme skutečně dorazili
                 transform.position = endPos;
+                
+                if (Managers.StatsManager.Instance != null)
+                {
+                    Managers.StatsManager.Instance.AddDistance(distanceTraveled);
+                    
+                    // Čas pohybu (přibližně): distance / speed
+                    Managers.StatsManager.Instance.AddMovingTime(distanceTraveled / _moveSpeed);
+                }
 
                 if (CurrentNode != targetNode && CurrentNode.OccupiedBy == this)
                 {

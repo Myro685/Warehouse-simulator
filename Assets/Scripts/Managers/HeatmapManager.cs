@@ -42,10 +42,11 @@ namespace Warehouse.Managers
             if (maxVisits == 0) maxVisits = 1;
 
             GridManager grid = GridManager.Instance;
+            if (grid == null) return;
 
-            for (int x = 0; x < grid._width; x++)
+            for (int x = 0; x < grid.Width; x++)
             {
-                for (int y = 0; y < grid._height; y++)
+                for (int y = 0; y < grid.Height; y++)
                 {
                     GridNode node = grid.GetNode(x, y);
                     if (node.VisitCount > 0)
@@ -72,7 +73,6 @@ namespace Warehouse.Managers
 
             // Instantiace overlaye na pozici nodu
             Vector3 pos = node.WorldPosition;
-            pos.y = 0.6f;
             pos.y = 0.05f;
 
             GameObject obj = Instantiate(_heatmapOverlayPrefab, pos, Quaternion.Euler(90, 0, 0), transform);
@@ -94,13 +94,16 @@ namespace Warehouse.Managers
             int max = 0;
 
             GridManager grid = GridManager.Instance;
-            for (int x = 0; x < grid._width; x++)
+            if (grid == null) return 0;
+            
+            for (int x = 0; x < grid.Width; x++)
             {
-                for (int y = 0; y < grid._height; y++)
+                for (int y = 0; y < grid.Height; y++)
                 {
-                    if (grid.GetNode(x, y).VisitCount > max)
+                    GridNode node = grid.GetNode(x, y);
+                    if (node != null && node.VisitCount > max)
                     {
-                        max = grid.GetNode(x, y).VisitCount;
+                        max = node.VisitCount;
                     }
                 }
             }
