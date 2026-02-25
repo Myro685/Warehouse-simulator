@@ -5,150 +5,271 @@ using Warehouse.Managers;
 
 namespace Warehouse.Pathfinding
 {
-    /// <summary>
-    /// Statická třída obsahující algoritmy pro hledání cesty.
-    /// </summary>
-    
     public enum PathAlgorithm
     {
         AStar,
         Dijkstra
     }
 
+    public interface IHeapItem<T> : System.IComparable<T>
+    {
+        int HeapIndex { get; set; }
+    }
+
+    public class MinHeap<T> where T : IHeapItem<T>
+    {
+        private T[] _items;
+        private int _currentItemCount;
+
+        public MinHeap(int maxHeapSize)
+        {
+            _items = new T[maxHeapSize];
+        }
+
+        public void Add(T item)
+        {
+            item.HeapIndex = _currentItemCount;
+            _items[_currentItemCount] = item;
+            SortUp(item);
+            _currentItemCount++;
+        }
+
+        public T RemoveFirst()
+        {
+            T firstItem = _items[0];
+            _currentItemCount--;
+            _items[0] = _items[_currentItemCount];
+            _items[0].HeapIndex = 0;
+            SortDown(_items[0]);
+            return firstItem;
+        }
+
+        public void UpdateItem(T item)
+        {
+            SortUp(item);
+        }
+
+        public int Count => _currentItemCount;
+
+        public bool Contains(T item)
+        {
+            if (item.HeapIndex < 0 || item.HeapIndex >= _currentItemCount) return false;
+            return object.Equals(_items[item.HeapIndex], item);
+        }
+
+        private void SortDown(T item)
+        {
+            while (true)
+            {
+                int childIndexLeft = item.HeapIndex * 2 + 1;
+                int childIndexRight = item.HeapIndex * 2 + 2;
+                int swapIndex = 0;
+
+                if (childIndexLeft < _currentItemCount)
+                {
+                    swapIndex = childIndexLeft;
+
+                    if (childIndexRight < _currentItemCount)
+                    {
+                        if (_items[childIndexLeft].CompareTo(_items[childIndexRight]) < 0)
+                        {
+                            swapIndex = childIndexRight;
+                        }
+                    }
+
+                    if (item.CompareTo(_items[swapIndex]) < 0)
+                    {
+                        Swap(item, _items[swapIndex]);
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    return;
+                }
+            }
+        }
+
+        private void SortUp(T item)
+        {
+            int parentIndex = (item.HeapIndex - 1) / 2;
+
+            while (true)
+            {
+                T parentItem = _items[parentIndex];
+                if (item.CompareTo(parentItem) > 0)
+                {
+                    Swap(item, parentItem);
+                }
+                else
+                {
+                    break;
+                }
+                parentIndex = (item.HeapIndex - 1) / 2;
+            }
+        }
+
+        private void Swap(T itemA, T itemB)
+        {
+            _items[itemA.HeapIndex] = itemB;
+            _items[itemB.HeapIndex] = itemA;
+            int itemAIndex = itemA.HeapIndex;
+            itemA.HeapIndex = itemB.HeapIndex;
+            itemB.HeapIndex = itemAIndex;
+        }
+    }
+
     public static class Pathfinder
     {
-        /// <summary>
-        /// Najde cestu z bodu A do bodu B pomocí A* algoritmu.
-        /// </summary>
-        /// <returns>Seznam uzlů tvořících cestu (nebo null, pokud cesta neexistuje).</returns>
-        public static List<GridNode> FindPath(GridNode startNode, GridNode targetNode, PathAlgorithm algorithm = PathAlgorithm.AStar)
+        private class PathNode : IHeapItem<PathNode>
         {
-            // Ošetření: Start nebo Cíl jsou neprůchozí
+            public GridNode Node { get; set; }
+            public int GCost { get; set; }
+            public int HCost { get; set; }
+            public PathNode Parent { get; set; }
+            public Vector2Int Direction { get; set; }
+            
+            public int FCost => GCost + HCost;
+            public int HeapIndex { get; set; }
+
+            public PathNode(GridNode node)
+            {
+                Node = node;
+                GCost = int.MaxValue;
+                HCost = 0;
+                Parent = null;
+                Direction = Vector2Int.zero;
+            }
+
+            public int CompareTo(PathNode other)
+            {
+                int compare = FCost.CompareTo(other.FCost);
+                if (compare == 0)
+                {
+                    compare = HCost.CompareTo(other.HCost);
+                }
+                // Vyšší priorita znamená vrácení kladného čísla, chceme řadit od nejmenšího FCost
+                return -compare;
+            }
+        }
+
+        public static List<GridNode> FindPath(GridNode startNode, GridNode targetNode, PathAlgorithm algorithm = PathAlgorithm.AStar, List<GridNode> ignoredNodes = null)
+        {
             if (!startNode.IsWalkable() || !targetNode.IsWalkable())
             {
-                Debug.LogWarning("Start nebo Cíl je neprůchozí!");
                 return null;
             }
 
-            // OPEN SET: Uzly k prozkoumání
-            List<GridNode> openSet = new List<GridNode>();
+            GridManager grid = GridManager.Instance;
+            if (grid == null) return null;
 
-            // CLOSED SET: Již prozkoumané uzly 
+            int maxHeapSize = grid.Width * grid.Height;
+            MinHeap<PathNode> openSet = new MinHeap<PathNode>(maxHeapSize);
             HashSet<GridNode> closedSet = new HashSet<GridNode>();
+            Dictionary<GridNode, PathNode> allNodes = new Dictionary<GridNode, PathNode>();
 
-            // Inicializace startního uzlu (resetujeme jeho pathfinding data)
-            startNode.GCost = 0;
-            startNode.HCost = algorithm == PathAlgorithm.AStar ? GetDistance(startNode, targetNode) : 0;
-            startNode.Parent = null;
-            openSet.Add(startNode);
+            PathNode GetPathNode(GridNode gridNode)
+            {
+                if (!allNodes.TryGetValue(gridNode, out PathNode pathNode))
+                {
+                    pathNode = new PathNode(gridNode);
+                    allNodes.Add(gridNode, pathNode);
+                }
+                return pathNode;
+            }
+
+            PathNode startPathNode = GetPathNode(startNode);
+            startPathNode.GCost = 0;
+            startPathNode.HCost = algorithm == PathAlgorithm.AStar ? GetDistance(startNode, targetNode) : 0;
+            openSet.Add(startPathNode);
 
             while (openSet.Count > 0)
             {
-                // 1. Najdi uzel v openSet s nejnižším FCost
-                GridNode currentNode = openSet[0];
-                for (int i = 1; i < openSet.Count; i++)
+                PathNode currentNode = openSet.RemoveFirst();
+                closedSet.Add(currentNode.Node);
+
+                if (currentNode.Node == targetNode)
                 {
-                    // Rozdíl A* vs Dijkstra je v tom, zda porovnáváme FCost (G+H) nebo jen GCost
-                    // Ale protože FCost = G + H, tak pro Dijkstru stačí nastavit H = 0.
-                    if (openSet[i].FCost < currentNode.FCost || 
-                       (openSet[i].FCost == currentNode.FCost && openSet[i].HCost < currentNode.HCost))
-                    {
-                        currentNode = openSet[i];
-                    }
+                    return RetracePath(startPathNode, currentNode);
                 }
 
-                openSet.Remove(currentNode);
-                closedSet.Add(currentNode);
-
-                // 2. Pokud jsme v cíli, sestav cestu
-                if (currentNode == targetNode)
+                foreach (GridNode neighborNode in grid.GetNeighbors(currentNode.Node))
                 {
-                    return RetracePath(startNode, targetNode);
-                }
+                    bool isIgnored = ignoredNodes != null && ignoredNodes.Contains(neighborNode);
 
-                // 3. Projdi sousedy
-                foreach (GridNode neighbor in GridManager.Instance.GetNeighbors(currentNode))
-                {
-                    // Pokud je soused neprůchozí nebo už hotový, přeskoč ho
-                    bool isOccupiedByOther = (neighbor.OccupiedBy != null);
-                    if (!neighbor.IsWalkable() || closedSet.Contains(neighbor) || isOccupiedByOther)
+                    if (!neighborNode.IsWalkable() || closedSet.Contains(neighborNode) || isIgnored)
                     {
                         continue;
                     }
 
-                    // Resetujeme pathfinding data souseda, pokud ještě nebyl inicializován v tomto běhu
-                    // (kontrolujeme, zda není v closedSet a zda má výchozí hodnoty)
-                    if (!closedSet.Contains(neighbor) && neighbor != startNode)
+                    PathNode neighborPathNode = GetPathNode(neighborNode);
+                    
+                    Vector2Int newDirection = new Vector2Int(neighborNode.GridX - currentNode.Node.GridX, neighborNode.GridY - currentNode.Node.GridY);
+                    
+                    int movementCostToNeighbor = currentNode.GCost + GetDistance(currentNode.Node, neighborNode);
+                    
+                    // Implementace penalizace za zatáčku (vyhlazení tras, preferuje rovné čáry)
+                    if (currentNode.Parent != null && currentNode.Direction != newDirection)
                     {
-                        // Pokud GCost je 0 (může být z předchozího běhu, kde byl tento uzel startem),
-                        // resetujeme ho na MaxValue pro správný výpočet
-                        if (neighbor.GCost == 0)
-                        {
-                            neighbor.GCost = int.MaxValue;
-                            neighbor.HCost = 0;
-                            neighbor.Parent = null;
-                        }
+                        movementCostToNeighbor += 2; 
                     }
 
-                    // Cena cesty k sousedovi = GCost aktuálního + vzdálenost (zde vždy 1)
-                    int newMovementCostToNeighbor = currentNode.GCost + GetDistance(currentNode, neighbor);
-
-                    // Pokud jsme našli kratší cestu k sousedovi NEBO soused ještě není v OpenSet
-                    if (newMovementCostToNeighbor < neighbor.GCost || !openSet.Contains(neighbor))
+                    if (movementCostToNeighbor < neighborPathNode.GCost || !openSet.Contains(neighborPathNode))
                     {
-                        neighbor.GCost = newMovementCostToNeighbor;
+                        neighborPathNode.GCost = movementCostToNeighbor;
+                        neighborPathNode.Direction = newDirection;
                         
                         if (algorithm == PathAlgorithm.AStar)
                         {
-                            neighbor.HCost = GetDistance(neighbor, targetNode);
-                        } else // Dijkstra
-                        {
-                            neighbor.HCost = 0; 
+                            neighborPathNode.HCost = GetDistance(neighborNode, targetNode);
                         }
-
-                        neighbor.Parent = currentNode; // Důležité: uložíme odkud jsme přišli
-
-                        if (!openSet.Contains(neighbor))
+                        else
                         {
-                            openSet.Add(neighbor);
+                            neighborPathNode.HCost = 0;
+                        }
+                        
+                        neighborPathNode.Parent = currentNode;
+
+                        if (!openSet.Contains(neighborPathNode))
+                        {
+                            openSet.Add(neighborPathNode);
+                        }
+                        else
+                        {
+                            openSet.UpdateItem(neighborPathNode);
                         }
                     }
                 }
             }
 
-            // Cesta nenalezena
             return null;
         }
 
-        /// <summary>
-        /// Zpětně projde rodiče od cíle ke startu a vytvoří seznam.
-        /// </summary>
-        private static List<GridNode> RetracePath(GridNode startNode, GridNode endNode)
+        private static List<GridNode> RetracePath(PathNode startPathNode, PathNode endPathNode)
         {
             List<GridNode> path = new List<GridNode>();
-            GridNode currentNode = endNode;
+            PathNode currentNode = endPathNode;
 
-            while (currentNode != startNode)
+            while (currentNode != startPathNode)
             {
-                path.Add(currentNode);
+                path.Add(currentNode.Node);
                 currentNode = currentNode.Parent;
             }
-            
-            // Cesta je pozpátku (Cíl -> Start), musíme ji otočit
             path.Reverse();
+
             return path;
         }
 
-        /// <summary>
-        /// Vypočítá Manhattan vzdálenost (pravoúhlá mřížka).
-        /// </summary>
         private static int GetDistance(GridNode nodeA, GridNode nodeB)
         {
             int dstX = Mathf.Abs(nodeA.GridX - nodeB.GridX);
             int dstY = Mathf.Abs(nodeA.GridY - nodeB.GridY);
-            
-            // V Manhattan metric je vzdálenost prostý součet rozdílů
-            return dstX + dstY;
+
+            // Základní vzdálenost násobena 10, aby penalizace +2 za zatočení fungovala jako menší váha
+            return (dstX + dstY) * 10;
         }
     }
 }

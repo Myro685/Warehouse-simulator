@@ -1,54 +1,54 @@
-using UnityEngine;
-
-namespace Warehouse.Core
-{
-    public class CameraController : MonoBehaviour
-    {
-        [Header("Movement Setting")]
-        [SerializeField] private float _moveSpeed = 20f;
-        [SerializeField] private float _zoomSpeed = 10f;
-        [SerializeField] private Vector2 _heightLimits = new Vector2(5f, 30f);
-        [SerializeField] private Vector2 _limitX = new Vector2(-10f, 50f);
-        [SerializeField] private Vector2 _limitZ = new Vector2(-20f, 40f);
-
-        private void Update()
-        {
-            HandleMovement();
-            HandleZoom();
-        }
-
-        private void HandleMovement()
-        {
-            float h = Input.GetAxis("Horizontal"); // A/D nebo Šipky
-            float v = Input.GetAxis("Vertical"); // W/S nebo Šipky
-
-            // Pohyb v rovině X/Z (ignorujeme rotaci kamery pro směr pohybu, chceme absolutní pohyb)
-            Vector3 moveDir = new Vector3(h, 0, v);
-
-            // Aplikace pohybu
-            Vector3 newPos = transform.position + moveDir * _moveSpeed * Time.unscaledDeltaTime;
-
-            // Omezení hranic (Clamping)
-            newPos.x = Mathf.Clamp(newPos.x, _limitX.x, _limitX.y);
-            newPos.z = Mathf.Clamp(newPos.z, _limitZ.x, _limitZ.y);
-
-            transform.position = newPos;
-        }
-
-        private void HandleZoom()
-        {
-            // Kolečko myši
-            float scroll = Input.GetAxis("Mouse ScrollWheel");
-        
-            if (scroll != 0)
-            {
-                Vector3 pos = transform.position;
-                // Přiblížení probíhá pohybem po ose Y 
-                // Zde uděláme jednoduchý vertikální zoom
-                pos.y -= scroll * _zoomSpeed * 100f * Time.unscaledDeltaTime;
-                pos.y = Mathf.Clamp(pos.y, _heightLimits.x, _heightLimits.y);
-                transform.position = pos;
-            }
-        }
-    }
+using UnityEngine;
+namespace Warehouse.Core
+{
+    public class CameraController : MonoBehaviour
+    {
+        [Header("Movement Setting")]
+        [SerializeField] private float _moveSpeed = 20f;
+        [SerializeField] private float _zoomSpeed = 10f;
+        [SerializeField] private float _damping = 5f;
+        [SerializeField] private Vector2 _heightLimits = new Vector2(5f, 30f);
+        [SerializeField] private Vector2 _limitX = new Vector2(-10f, 50f);
+        [SerializeField] private Vector2 _limitZ = new Vector2(-20f, 40f);
+        private Vector3 _targetPosition;
+        private void Start()
+        {
+            _targetPosition = transform.position;
+        }
+        private void Update()
+        {
+            HandleMovement();
+            HandleZoom();
+            transform.position = Vector3.Lerp(transform.position, _targetPosition, Time.unscaledDeltaTime * _damping);
+        }
+        private void HandleMovement()
+        {
+            float h = Input.GetAxisRaw("Horizontal"); 
+            float v = Input.GetAxisRaw("Vertical"); 
+            Vector3 moveDir = new Vector3(h, 0, v);
+            _targetPosition += moveDir * _moveSpeed * Time.unscaledDeltaTime;
+            _targetPosition.x = Mathf.Clamp(_targetPosition.x, _limitX.x, _limitX.y);
+            _targetPosition.z = Mathf.Clamp(_targetPosition.z, _limitZ.x, _limitZ.y);
+        }
+        private void HandleZoom()
+        {
+            float scroll = Input.GetAxisRaw("Mouse ScrollWheel");
+            if (scroll != 0)
+            {
+                _targetPosition.y -= scroll * _zoomSpeed * 100f * Time.unscaledDeltaTime;
+                _targetPosition.y = Mathf.Clamp(_targetPosition.y, _heightLimits.x, _heightLimits.y);
+            }
+        }
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = Color.red;
+            float width = _limitX.y - _limitX.x;
+            float depth = _limitZ.y - _limitZ.x;
+            float centerX = _limitX.x + width / 2;
+            float centerZ = _limitZ.x + depth / 2;
+            Vector3 center = new Vector3(centerX, 0, centerZ); 
+            Vector3 size = new Vector3(width, 10, depth);
+            Gizmos.DrawWireCube(center, size);
+        }
+    }
 }
